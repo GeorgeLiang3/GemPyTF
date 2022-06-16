@@ -14,6 +14,8 @@ The current version is depend on an older version of GemPy-'2.1.1'
 - `conda install scipy`
 - skimage < '0.18.2' and for MacOS < 10.13.6 need older skimage version `pip install -U scikit-image==0.17.2  ` [stackoverflow answer](https://stackoverflow.com/questions/65431999/it-seems-that-scikit-learn-has-not-been-built-correctly)
 
+> :warning: **now Theano is still needed to be impored, although not actually used and won't prompt bug**: need to modify this
+
 ## Limitations
 At the moment there are only limited models are tested (in [Examples](/Examples/)). 
 
