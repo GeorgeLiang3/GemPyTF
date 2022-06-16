@@ -1,6 +1,4 @@
 # %%
-
-# import os
 import sys
 sys.path.append('../GP_old/')
 
@@ -29,8 +27,7 @@ geo_data.set_is_fault(['Fault_Series'])
 
 # %%
 ## I will integrate the module into GemPy through Interpolator later
-# from gempy.core.tensor.interpolator_tf import InterpolatorTF
-# model = InterpolatorTF(geo_data)
+
 model = InterpolatorTF(geo_data)
 gpinput = model.get_graph_input()
 model.create_tensorflow_graph(gpinput,gradient = False)

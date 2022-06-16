@@ -1,32 +1,23 @@
 # %%
-
-# import os
 import sys
 sys.path.append('../GP_old/')
 
 import gempy as gp
-
-from gempy.core.tensor.tensorflow_graph_uncon_sig_fault import TFGraph
-
-from gempy import create_data, map_series_to_surfaces
 from gempy.core.tensor.interpolator_tf import InterpolatorTF
 
 # %%
 data_path = 'https://raw.githubusercontent.com/cgre-aachen/gempy_data/master/'
 path_to_data = data_path + "/data/input_data/jan_models/"
-
 geo_data = gp.create_data( extent=[0, 1000, 0, 1000, 0, 1000], resolution=[50, 50, 50],
                           path_o=path_to_data + "model3_orientations.csv",
                           path_i=path_to_data + "model3_surface_points.csv")
 
 
-map_series_to_surfaces(geo_data, {"Strat_Series": ('rock2', 'rock1'), "Basement_Series": ('basement')})
+gp.map_series_to_surfaces(geo_data, {"Strat_Series": ('rock2', 'rock1'), "Basement_Series": ('basement')})
 
 
 # %%
 ## I will integrate the module into GemPy through Interpolator later
-# from gempy.core.tensor.interpolator_tf import InterpolatorTF
-# model = InterpolatorTF(geo_data)
 model = InterpolatorTF(geo_data)
 gpinput = model.get_graph_input()
 model.create_tensorflow_graph(gpinput,gradient = False)
