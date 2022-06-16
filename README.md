@@ -7,7 +7,7 @@ GemPy is the most famous Python-based 3-D structural geological modeling open-so
 
 ## Installation and dependency
 The current version is depend on an older version of GemPy-'2.1.1'
-
+- skimage -- '0.18.2'
 
 ## Limitations
 At the moment there are only limited models are tested (in [Examples](/Examples/)). 
