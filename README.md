@@ -13,10 +13,10 @@ The current version is depend on an older version of GemPy-'2.1.1'
 At the moment there are only limited models are tested (in [Examples](/Examples/)). 
 
 current version has 
--- no support for topology
--- no support for fault block
--- not been tested with topography
+- no support for topology
+- no support for fault block
+- not been tested with topography
 
 ### Known bugs to be fixed
--- 3D color map is in wrong order
--- 2D plot function `show_data` function not correct
+- 3D color map is in wrong order
+- 2D plot function `show_data` function not correct
