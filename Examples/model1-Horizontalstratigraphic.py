@@ -1,14 +1,10 @@
 # %%
-# import tensorflow as tf
 
 # import os
-# import numpy as np
 import sys
-# import timeit
-# import csv
-sys.path.append('/Users/zhouji/Google Drive/YJ/GP_old/')
+sys.path.append('../GP_old/')
 
-sys.path.append('/Users/zhouji/Google Drive/YJ/')
+# sys.path.append('/Users/zhouji/Google Drive/YJ/')
 import gempy as gp
 import matplotlib.pyplot as plt
 # import matplotlib.tri as tri
