@@ -379,6 +379,7 @@ class GemPyToVista(WidgetsCallbacks, RenderChanges):
             poly['id'] = surface_points['id']
             self.surface_points_mesh = poly
             cmap = mcolors.ListedColormap(list(self._get_color_lot(is_faults=True, is_basement=True)))
+            print(cmap.colors)
             self.surface_points_actor = self.p.add_mesh(poly, cmap=cmap,
                                                         scalars='id',
                                                         render_points_as_spheres=render_points_as_spheres,
@@ -641,6 +642,7 @@ class GemPyToVista(WidgetsCallbacks, RenderChanges):
         else: 
             regular_grid, cmap = self.create_regular_mesh(scalar_field, data,
                                                       series, render_topography)
+            print('structred_grid:', cmap.colors)
 
         return self.add_regular_grid_mesh(regular_grid, cmap, scalar_field, series,
                                           opacity, **kwargs)

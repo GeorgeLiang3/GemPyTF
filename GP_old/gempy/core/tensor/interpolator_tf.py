@@ -3,9 +3,11 @@ from gempy.core.data import SurfacePoints, Orientations, Grid, Surfaces, Series,
 import tensorflow as tf
 from gempy.core.tensor.tensorflow_graph_uncon_sig_fault import TFGraph
 from gempy.core.solution import Solution
+from gempy.core.model import DataMutation
 
-class InterpolatorTF(object):
+class ModelTF(DataMutation):
     def __init__(self,geo_data) -> None:
+        super().__init__()
         self.geo_data = geo_data
         self.tfdtype = tf.float64
         self.dtype = 'float64'
@@ -344,3 +346,5 @@ class InterpolatorTF(object):
             [final_block[l0: l1].numpy(), self.TFG.scalar_matrix[:, l0: l1].numpy().astype(float)])
         
         self.solutions.compute_all_surfaces()
+
+        self.set_surface_order_from_solution()

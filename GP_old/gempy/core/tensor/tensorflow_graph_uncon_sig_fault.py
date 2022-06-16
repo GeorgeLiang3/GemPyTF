@@ -818,7 +818,6 @@ class TFGraph(tf.Module):
 
 
         x_to_interpolate_shape = self.grid_val.shape[0] + 2 * self.len_points        
-        tf.print('x_to_interpolate_shape',x_to_interpolate_shape)
 
         faults_relation_op = self.fault_relation[:, n_series]
 

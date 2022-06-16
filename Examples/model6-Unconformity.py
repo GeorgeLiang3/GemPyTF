@@ -4,7 +4,7 @@ sys.path.append('../GP_old/')
 
 import gempy as gp
 
-from gempy.core.tensor.interpolator_tf import InterpolatorTF
+from gempy.core.tensor.interpolator_tf import ModelTF
 
 # %%
 data_path = 'https://raw.githubusercontent.com/cgre-aachen/gempy_data/master/'
@@ -21,7 +21,7 @@ gp.map_series_to_surfaces(geo_data, {"Strat_Series1": ('rock3'),
 
 # %%
 ## I will integrate the module into GemPy through Interpolator later
-model = InterpolatorTF(geo_data)
+model = ModelTF(geo_data)
 gpinput = model.get_graph_input()
 model.create_tensorflow_graph(gpinput,gradient = False)
 
@@ -30,7 +30,6 @@ model.compute_model()
 
 # %%
 from gempy.plot.vista import GemPyToVista
-import pyvista as pv
 
 gpv = GemPyToVista(model)
 gpv.plot_surface_points(surfaces='all')
