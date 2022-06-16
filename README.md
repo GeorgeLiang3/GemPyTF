@@ -7,6 +7,7 @@ GemPy is the most popular Python-based 3-D structural geological modeling open-s
 
 ## Installation and dependency
 The current version is depend on an older version of GemPy-'2.1.1'
+Test and wrap this in a single installation file as e.g. `requirements.txt`
 - create conda environment `conda create --name gempytf python==3.7`
 - `pip install --upgrade pip`
 - `pip install tensorflow`
