@@ -4,7 +4,6 @@ sys.path.append('../GP_old/')
 
 import gempy as gp
 
-
 from gempy.core.tensor.interpolator_tf import ModelTF
 
 # %%
@@ -44,4 +43,4 @@ gpv.plot_structured_grid(scalar_field= 'lith')
 gpv.p.show()
 # %%
 gp.plot.plot_section(model, cell_number=15,
-                         direction='y', show_data=True)
+                         direction='y', show_data=True,show_all_data = True)
