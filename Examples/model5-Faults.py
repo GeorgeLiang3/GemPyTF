@@ -1,20 +1,8 @@
 # %%
-
-# import os
 import sys
 sys.path.append('../GP_old/')
 
-# sys.path.append('/Users/zhouji/Google Drive/YJ/')
 import gempy as gp
-import matplotlib.pyplot as plt
-# import matplotlib.tri as tri
-import json 
-from gempy.core.tensor.tensorflow_graph_uncon_sig_fault import TFGraph
-
-import tensorflow_probability as tfp
-# import pandas as pd
-from gempy.core.solution import Solution
-from gempy import create_data, map_series_to_surfaces
 from gempy.core.tensor.interpolator_tf import InterpolatorTF
 
 # %%
@@ -27,7 +15,7 @@ geo_data = gp.create_data( extent=[0, 1000, 0, 1000, 0, 1000], resolution=[50, 5
 
 geo_data.get_data()
 
-map_series_to_surfaces(geo_data, {"Fault_Series": 'fault',
+gp.map_series_to_surfaces(geo_data, {"Fault_Series": 'fault',
                                     "Strat_Series": ('rock2', 'rock1')})
 geo_data.set_is_fault(['Fault_Series'])
 

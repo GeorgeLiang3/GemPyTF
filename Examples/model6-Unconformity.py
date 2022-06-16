@@ -1,14 +1,9 @@
 # %%
-
-# import os
 import sys
 sys.path.append('../GP_old/')
 
 import gempy as gp
 
-from gempy.core.tensor.tensorflow_graph_uncon_sig_fault import TFGraph
-
-from gempy import create_data, map_series_to_surfaces
 from gempy.core.tensor.interpolator_tf import InterpolatorTF
 
 # %%
@@ -20,7 +15,7 @@ geo_data = gp.create_data( extent=[0, 1000, 0, 1000, 0, 1000], resolution=[50, 5
                           path_i=path_to_data + "model6_surface_points.csv")
 
 # %%
-map_series_to_surfaces(geo_data, {"Strat_Series1": ('rock3'),
+gp.map_series_to_surfaces(geo_data, {"Strat_Series1": ('rock3'),
                                     "Strat_Series2": ('rock2', 'rock1'),
                                     "Basement_Series": ('basement')})
 
