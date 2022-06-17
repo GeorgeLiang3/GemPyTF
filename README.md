@@ -13,6 +13,7 @@ Test and wrap this in a single installation file as e.g. `requirements.txt`
 - `pip install tensorflow`
 - `conda install pandas`
 - `conda install scipy`
+- `pip install nptyping==1.0.1`
 - skimage < '0.18.2' and for MacOS < 10.13.6 need older skimage version `pip install -U scikit-image==0.17.2  ` [stackoverflow answer](https://stackoverflow.com/questions/65431999/it-seems-that-scikit-learn-has-not-been-built-correctly)
 
 These are all required packages from the older version of GemPy-'2.1.1'
