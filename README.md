@@ -42,7 +42,6 @@ These are all required packages from the older version of GemPy-'2.1.1'
 - `pytest`
 - `pyqt5`
 
-> :warning: **now Theano is still needed to be impored, although not actually used and won't prompt bug**: need to modify this
 
 ## Limitations
 At the moment there are only limited models are tested (in [Examples](/Examples/)). 
