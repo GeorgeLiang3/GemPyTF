@@ -5,7 +5,7 @@ sys.path.append('../GP_old/')
 import gempy as gp
 
 from gempy import map_series_to_surfaces
-from gempy.core.tensor.interpolator_tf import ModelTF
+from gempy.core.tensor.modeltf import ModelTF
 
 # %%
 data_path = 'https://raw.githubusercontent.com/cgre-aachen/gempy_data/master/'

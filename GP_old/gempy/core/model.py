@@ -10,7 +10,11 @@ import warnings
 from gempy.core.data import AdditionalData, Faults, Grid, MetaData, Orientations, RescaledData, Series, SurfacePoints,\
     Surfaces, Options, Structure, KrigingParameters
 from gempy.core.solution import Solution
-from gempy.core.interpolator import InterpolatorModel, InterpolatorGravity
+# from gempy.core.interpolator import InterpolatorModel, InterpolatorGravity
+
+## This is the tensorflow interpolator initializer
+from gempy.core.interpolator_pro import InterpolatorTF
+
 from gempy.utils.meta import setdoc, setdoc_pro
 import gempy.utils.docstring as ds
 from gempy.plot.decorators import *
@@ -19,9 +23,9 @@ pn.options.mode.chained_assignment = None
 
 
 # TODO rename to ImplicitCoKriging
-@setdoc_pro([Grid.__doc__, Faults.__doc__, Series.__doc__, Surfaces.__doc__, SurfacePoints.__doc__,
-             Orientations.__doc__, RescaledData.__doc__, AdditionalData.__doc__, InterpolatorModel.__doc__,
-             Solution.__doc__])
+# @setdoc_pro([Grid.__doc__, Faults.__doc__, Series.__doc__, Surfaces.__doc__, SurfacePoints.__doc__,
+#              Orientations.__doc__, RescaledData.__doc__, AdditionalData.__doc__, InterpolatorModel.__doc__,
+#              Solution.__doc__])
 class DataMutation(object):
     """
     This class handles all the mutation of an object belonging to model and the update of every single object depend
@@ -54,7 +58,9 @@ class DataMutation(object):
         self.additional_data = AdditionalData(self.surface_points, self.orientations, self.grid, self.faults,
                                               self.surfaces, self.rescaling)
 
-        self.interpolator = InterpolatorModel(self.surface_points, self.orientations, self.grid, self.surfaces,
+        # self.interpolator = InterpolatorModel(self.surface_points, self.orientations, self.grid, self.surfaces,
+        #                                       self.series, self.faults, self.additional_data)
+        self.interpolator = InterpolatorTF(self.surface_points, self.orientations, self.grid, self.surfaces,
                                               self.series, self.faults, self.additional_data)
 
         self.solutions = Solution(self.grid, self.surfaces, self.series)
@@ -83,9 +89,9 @@ class DataMutation(object):
 
         return idx
 
-    @setdoc_pro([AdditionalData.update_structure.__doc__, InterpolatorModel.set_theano_shared_structure.__doc__,
-                 InterpolatorModel.modify_results_matrices_pro.__doc__,
-                 InterpolatorModel.modify_results_weights.__doc__])
+    # @setdoc_pro([AdditionalData.update_structure.__doc__, InterpolatorModel.set_theano_shared_structure.__doc__,
+    #              InterpolatorModel.modify_results_matrices_pro.__doc__,
+    #              InterpolatorModel.modify_results_weights.__doc__])
     def update_structure(self, update_theano=None, update_series_is_active=True, update_surface_is_active=True):
         """Update python and theano structure parameters.
 
@@ -141,12 +147,12 @@ class DataMutation(object):
         self.rescaling.rescale_data()
         self.interpolator.set_initial_results_matrices()
 
-        if 'gravity' in self.interpolator.theano_graph.output or 'magnetics' in self.interpolator.theano_graph.output:
-            self.interpolator.set_theano_shared_l0_l1()
+        # if 'gravity' in self.interpolator.theano_graph.output or 'magnetics' in self.interpolator.theano_graph.output:
+        #     self.interpolator.set_theano_shared_l0_l1()
 
-        # Check if grid is shared
-        if hasattr(self.interpolator.theano_graph.grid_val_T, 'get_value'):
-            self.interpolator.theano_graph.grid_val_T.set_value(self.grid.values_r.astype(self.interpolator.dtype))
+        # # Check if grid is shared
+        # if hasattr(self.interpolator.theano_graph.grid_val_T, 'get_value'):
+        #     self.interpolator.theano_graph.grid_val_T.set_value(self.grid.values_r.astype(self.interpolator.dtype))
 
     def set_active_grid(self, grid_name: Union[str, np.ndarray], reset=False):
         """
@@ -988,39 +994,39 @@ class DataMutation(object):
         return True
 
     # region Theano interface
-    @setdoc(InterpolatorModel.__doc__)
-    def set_theano_graph(self, interpolator: InterpolatorModel):
-        """Pass a theano graph of a Interpolator instance other than the Model compose
+    # @setdoc(InterpolatorModel.__doc__)
+    # def set_theano_graph(self, interpolator: InterpolatorModel):
+    #     """Pass a theano graph of a Interpolator instance other than the Model compose
 
-        Use this method only if you know what are you doing!
+    #     Use this method only if you know what are you doing!
 
-        Args:
-            interpolator (:class:`InterpolatorModel`): [s0]
+    #     Args:
+    #         interpolator (:class:`InterpolatorModel`): [s0]
 
-        Returns:
-             True """
-        self.interpolator.theano_graph = interpolator.theano_graph
-        self.interpolator.theano_function = interpolator.theano_function
-        self.update_to_interpolator()
-        return True
+    #     Returns:
+    #          True """
+    #     self.interpolator.theano_graph = interpolator.theano_graph
+    #     self.interpolator.theano_function = interpolator.theano_function
+    #     self.update_to_interpolator()
+    #     return True
 
-    @setdoc(InterpolatorModel.__doc__)
-    def set_theano_function(self, interpolator: InterpolatorModel):
-        """
-        Pass a theano function and its correspondent graph from an Interpolator instance other than the Model compose
+    # @setdoc(InterpolatorModel.__doc__)
+    # def set_theano_function(self, interpolator: InterpolatorModel):
+    #     """
+    #     Pass a theano function and its correspondent graph from an Interpolator instance other than the Model compose
 
-        Args:
-            interpolator (:class:`InterpolatorModel`): [s0]
+    #     Args:
+    #         interpolator (:class:`InterpolatorModel`): [s0]
 
-        Returns:
-             True
-        """
+    #     Returns:
+    #          True
+    #     """
 
-        self.interpolator.theano_graph = interpolator.theano_graph
-        self.interpolator.theano_function = interpolator.theano_function
-        self.interpolator.set_all_shared_parameters()
-        self.update_structure(update_theano='matrices')
-        return True
+    #     self.interpolator.theano_graph = interpolator.theano_graph
+    #     self.interpolator.theano_function = interpolator.theano_function
+    #     self.interpolator.set_all_shared_parameters()
+    #     self.update_structure(update_theano='matrices')
+    #     return True
 
     def update_to_interpolator(self, reset=True):
         """Update all shared parameters from the data objects
@@ -1355,9 +1361,12 @@ class Model(DataMutation, ABC):
         if verbose is not None:
             self.additional_data.options.df.at['values', 'verbosity'] = verbose
 
-        self.interpolator_gravity = InterpolatorGravity(
+        self.interpolator_gravity = InterpolatorTF(
             self.surface_points, self.orientations, self.grid, self.surfaces,
             self.series, self.faults, self.additional_data, **kwargs)
+        # self.interpolator_gravity = InterpolatorGravity(
+        #     self.surface_points, self.orientations, self.grid, self.surfaces,
+        #     self.series, self.faults, self.additional_data, **kwargs)
 
         # geo_model.interpolator.set_theano_graph(geo_model.interpolator.create_theano_graph())
         self.interpolator_gravity.create_theano_graph(self.additional_data, inplace=True)
