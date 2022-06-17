@@ -33,6 +33,48 @@ class InterpolatorTF(object):
         self.compute_weights_ctrl = np.ones(n_series, dtype=bool)
         self.compute_scalar_ctrl = np.ones(n_series, dtype=bool)
         self.compute_block_ctrl = np.ones(n_series, dtype=bool)
+    
+    def set_theano_shared_kriging(self):
+        """
+        Set to the theano_graph attribute the shared variables of kriging values from the linked
+         :class:`AdditionalData`.
+
+        Returns:
+            True
+        """
+        # Range
+        # TODO add rescaled range and co into the rescaling data df?
+        # self.theano_graph.a_T.set_value(np.cast[self.dtype]
+        #                                 (self.additional_data.kriging_data.df.loc['values', 'range'] /
+        #                                  self.additional_data.rescaling_data.df.loc[
+        #                                      'values', 'rescaling factor']))
+        # Covariance at 0
+        # self.theano_graph.c_o_T.set_value(np.cast[self.dtype](
+        #     self.additional_data.kriging_data.df.loc['values', '$C_o$'] /
+        #     self.additional_data.rescaling_data.df.loc[
+        #         'values', 'rescaling factor']
+        # ))
+        # universal grades
+        # self.theano_graph.n_universal_eq_T.set_value(
+        #     list(self.additional_data.kriging_data.df.loc['values', 'drift equations'].astype('int32')[self.non_zero]))
+
+        self.set_theano_shared_nuggets()
+
+    def set_theano_shared_nuggets(self):
+        # nugget effect
+        # len_orientations = self.additional_data.structure_data.df.loc['values', 'len series orientations']
+        # len_orientations_len = np.sum(len_orientations)
+
+        # self.theano_graph.nugget_effect_grad_T.set_value(
+        #     np.cast[self.dtype](np.tile(
+        #         self.orientations.df['smooth'], 3)))
+
+        # len_rest_form = (self.additional_data.structure_data.df.loc['values', 'len surfaces surface_points'])
+        # len_rest_len = np.sum(len_rest_form)
+        # self.theano_graph.nugget_effect_scalar_T.set_value(
+        #     np.cast[self.dtype](self.surface_points.df['smooth']))
+        return True
+
 
     def set_theano_shared_structure_surfaces(self):
         """
