@@ -30,7 +30,7 @@ from gempy.core.model import Model, DataMutation, AdditionalData, Faults, Grid, 
 from gempy.core.solution import Solution
 from gempy.utils.meta import setdoc, setdoc_pro
 import gempy.utils.docstring as ds
-from gempy.core.interpolator import InterpolatorModel
+# from gempy.core.interpolator import InterpolatorTF
 
 
 # This warning comes from numpy complaining about a theano optimization
@@ -122,7 +122,7 @@ def set_orientation_from_surface_points(geo_model, indices_array):
 
 
 # region Interpolator functionality
-@setdoc([InterpolatorModel.__doc__])
+# @setdoc([InterpolatorModel.__doc__])
 @setdoc_pro([Model.__doc__, ds.compile_theano, ds.theano_optimizer])
 def set_interpolation_data(*args, **kwargs):
     warnings.warn('set_interpolation_data will be deprecrated in GemPy 2.2. Use '
@@ -130,7 +130,7 @@ def set_interpolation_data(*args, **kwargs):
     return set_interpolator(*args, **kwargs)
 
 
-@setdoc([InterpolatorModel.__doc__])
+# @setdoc([InterpolatorModel.__doc__])
 @setdoc_pro([Model.__doc__, ds.compile_theano, ds.theano_optimizer])
 def set_interpolator(geo_model: Model, output: list = None, compile_theano: bool = True,
                      theano_optimizer=None, verbose: list = None, grid=None, type_=None,

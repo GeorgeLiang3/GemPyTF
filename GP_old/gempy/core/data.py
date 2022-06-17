@@ -2717,13 +2717,13 @@ class Options(object):
         Returns:
             bool: True
         """
-        import theano
-        self.df.loc['values', 'device'] = theano.config.device
+        # import theano
+        # self.df.loc['values', 'device'] = theano.config.device
 
-        if theano.config.device == 'cpu':
-            self.df.loc['values', 'dtype'] = 'float64'
-        else:
-            self.df.loc['values', 'dtype'] = 'float32'
+        # if theano.config.device == 'cpu':
+        #     self.df.loc['values', 'dtype'] = 'float64'
+        # else:
+        #     self.df.loc['values', 'dtype'] = 'float32'
 
        # self.df.loc['values', 'output'] = 'geology'
         self.df.loc['values', 'theano_optimizer'] = 'fast_compile'
