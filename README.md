@@ -10,6 +10,7 @@ The current version is depend on an older version of GemPy-'2.1.1'
 
 TODO: Test and wrap this in a single installation file as e.g. `requirements.txt`
 - create conda environment `conda create --name gempytf python==3.7`
+- `git clone https://github.com/GeorgeLiang3/GemPyTF.git`
 - `pip install --upgrade pip`
 - `pip install tensorflow`
 - `conda install pandas`
