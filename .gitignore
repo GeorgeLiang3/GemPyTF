@@ -1,3 +1,4 @@
 Resultscollect/
 Geophysics/
 .DS_Store
+__pycache__/
