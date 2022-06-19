@@ -4,6 +4,7 @@ This is a TensorFlow extension of [GemPy](https://github.com/cgre-aachen/gempy).
 ## Why TensorFlow
 GemPy is the most popular Python-based 3-D structural geological modeling open-source software now, which allows the implicit (i.e. automatic) creation of complex geological models from interface and orientation data. We all love GemPy, however, the installation of [Theano](https://en.wikipedia.org/wiki/Theano_(software)) sometime could be frustrating. Therefore this project aims to extend the backend of GemPy with the modern machine learning package [TensorFlow](https://www.tensorflow.org/) for Automatic Differentiation (AD).
 
+Try the simple demos in colab: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GeorgeLiang3/GemPyTF/blob/main/GemPyTF_demo.ipynb)
 
 ## Installation and dependency
 The current version is depend on an older version of GemPy-'2.1.1'
