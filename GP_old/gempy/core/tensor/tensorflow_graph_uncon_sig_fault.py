@@ -402,7 +402,7 @@ class TFGraph(tf.Module):
         U_G = U_G[:length_of_CG, :3]
         U_I = U_I[:length_of_CGI, :3]
         F_I, F_G = self.faults_matrix()
-        # tf.print("F_I,F_G",F_I,F_G)
+        tf.print("F_I,F_G",F_I,F_G)
 
         # A: containing all the covariance matrix 
         A = tf.concat([tf.concat([C_G, tf.transpose(C_GI)], -1),
@@ -415,7 +415,10 @@ class TFGraph(tf.Module):
 
         B_T = tf.transpose(B)
 
-        paddings = tf.constant([[0, 0], [0, 3 + F_I.shape[0]]])
+        if F_I.shape[0] is not None:
+          paddings = tf.constant([[0, 0], [0, 3 + F_I.shape[0]]])
+        else:
+          paddings = tf.constant([[0, 0], [0, 3]])
         C = tf.pad(B_T, paddings)
 
         F = tf.concat([F_G, F_I], -1)
@@ -825,12 +828,15 @@ class TFGraph(tf.Module):
         # indices = tf.squeeze(indices)
         fault_matrix_op = tf.gather(self.fault_matrix,indices) # select the dimension where fault relation is true
         fault_matrix_op = tf.reshape(fault_matrix_op,[-1,x_to_interpolate_shape])* self.offset
-        # tf.print(fault_matrix_op)
+        tf.print('fault_matrix_op: ',fault_matrix_op)
         # fault_matrix_op = self.fault_matrix[
         #                   T.nonzero(tf.cast(faults_relation_op, tf.int8))[0],
         #                   0, shift:x_to_interpolate_shape + shift] * self.offset
 
-        self.lengh_of_faults = tf.cast(fault_matrix_op.shape[0], tf.int32)
+        if fault_matrix_op.shape[0] is None:
+          self.lengh_of_faults =  tf.constant(0, dtype=tf.int32)
+        else:
+          self.lengh_of_faults = tf.cast(fault_matrix_op.shape[0], tf.int32)
 
         # Erosion version
         ## Hope this work in Hessian calcualtion
