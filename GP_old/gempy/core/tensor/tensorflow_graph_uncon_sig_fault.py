@@ -402,7 +402,6 @@ class TFGraph(tf.Module):
         U_G = U_G[:length_of_CG, :3]
         U_I = U_I[:length_of_CGI, :3]
         F_I, F_G = self.faults_matrix()
-        tf.print("F_I,F_G",F_I,F_G)
 
         # A: containing all the covariance matrix 
         A = tf.concat([tf.concat([C_G, tf.transpose(C_GI)], -1),
@@ -828,7 +827,6 @@ class TFGraph(tf.Module):
         # indices = tf.squeeze(indices)
         fault_matrix_op = tf.gather(self.fault_matrix,indices) # select the dimension where fault relation is true
         fault_matrix_op = tf.reshape(fault_matrix_op,[-1,x_to_interpolate_shape])* self.offset
-        tf.print('fault_matrix_op: ',fault_matrix_op)
         # fault_matrix_op = self.fault_matrix[
         #                   T.nonzero(tf.cast(faults_relation_op, tf.int8))[0],
         #                   0, shift:x_to_interpolate_shape + shift] * self.offset
