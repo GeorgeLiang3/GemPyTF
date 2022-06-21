@@ -28,15 +28,7 @@ model.create_tensorflow_graph(gpinput,gradient = False)
 model.compute_model()
 # %%
 ### 3D plot
-# still in a hacky way
-from gempy.plot.vista import GemPyToVista
-
-gpv = GemPyToVista(model)
-gpv.plot_surface_points(surfaces='all')
-gpv.plot_orientations()
-gpv.plot_surfaces()
-gpv.plot_structured_grid(scalar_field= 'lith')
-gpv.p.show()
+gp._plot.plot_3d(model)
 # %%
 gp.plot.plot_section(model, cell_number=15,
                          direction='y', show_data=True)

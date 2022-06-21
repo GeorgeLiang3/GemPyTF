@@ -26,8 +26,9 @@ orientations = Moureze_points[~mask_surfpoints]
 surfpoints['surface'] = '0'
 orientations['surface'] = '0'
 # %%
-resolution_requ = [156, 206, 76]
-resolution = [77, 103, 38]
+# different resolutions for performance check
+# resolution_requ = [156, 206, 76]
+# resolution = [77, 103, 38]
 resolution_low = [45, 51, 38]
 geo_model = gp.create_model('Moureze')
 geo_model = gp.init_data(geo_model,
@@ -45,12 +46,9 @@ model.create_tensorflow_graph(gpinput,gradient = False)
 # %%
 model.compute_model()
 # %%
-from gempy.plot.vista import GemPyToVista
+# Plot in 3D
+gp._plot.plot_3d(model)
 
-gpv = GemPyToVista(model)
-gpv.plot_surface_points(surfaces='all')
-gpv.plot_orientations()
-gpv.plot_surfaces()
-gpv.plot_structured_grid(scalar_field= 'lith')
-gpv.p.show()
 # %%
+# Plot the top surface lithlogy
+gp._plot.plot_2d(model,cell_number = [49],show_data = True,direction = ['z'],figsize = (10,10))
