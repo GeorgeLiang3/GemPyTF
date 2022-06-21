@@ -33,16 +33,15 @@ import matplotlib.pyplot as plt
 # import gempy as _gempy
 import numpy as np
 import pandas as pn
-from gempy.plot.vista import GemPyToVista
 
 # Keep Alex code hidden until we merge it properly
 try:
     import pyvista as pv
-    from .vista import _Vista as Vista
+    # from .vista import _Vista as Vista
     PYVISTA_IMPORT = True
 except ImportError:
     PYVISTA_IMPORT = False
-
+print("PYVISTA_IMPORT",PYVISTA_IMPORT)
 from .visualization_2d_pro import Plot2D
 
 try:
@@ -246,96 +245,99 @@ def plot_stereonet(self, litho=None, planes=True, poles=True,
         ax.legend(by_label.values(), by_label.keys(), bbox_to_anchor=(1.9, 1.1))
         ax.grid(True, color='black', alpha=0.25)
 
-def plot_3d(model, plotter_type='basic',
-            show_data: bool = True,
-            show_results: bool = True,
-            show_surfaces: bool = True,
-            show_lith: bool = True,
-            show_scalar: bool = False,
-            show_boundaries: bool = True,
-            show_topography: Union[bool, list] = False,
-            scalar_field: str = None,
-            ve=None,
-            kwargs_plot_structured_grid=None,
-            kwargs_plot_topography=None,
-            kwargs_plot_data=None,
-            image=False,
-            off_screen=False, **kwargs) -> GemPyToVista:
-    """foobar
+if PYVISTA_IMPORT:
+    from gempy.plot.vista import GemPyToVista
+    def plot_3d(model, plotter_type='basic',
+                show_data: bool = True,
+                show_results: bool = True,
+                show_surfaces: bool = True,
+                show_lith: bool = True,
+                show_scalar: bool = False,
+                show_boundaries: bool = True,
+                show_topography: Union[bool, list] = False,
+                scalar_field: str = None,
+                ve=None,
+                kwargs_plot_structured_grid=None,
+                kwargs_plot_topography=None,
+                kwargs_plot_data=None,
+                image=False,
+                off_screen=False, **kwargs) -> GemPyToVista:
+        """foobar
 
-    Args:
+        Args:
 
-        model (:class:`gempy.core.model.Project`): Container class of all
-         objects that constitute a GemPy model.
-        plotter_type: PyVista plotter types. Supported plotters are:
-         'basic', 'background', and 'notebook'.
-        show_data (bool): Show original input data. Defaults to True.
-        show_results (bool): If False, override show lith, show_scalar, show_values
-        show_lith (bool): Show lithological block volumes. Defaults to True.
-        show_scalar (bool): Show scalar field isolines. Defaults to False.
-        show_boundaries (bool): Show surface boundaries as lines. Defaults to True.
-        show_topography (bool): Show topography on plot. Defaults to False.
-        scalar_field (str): Name of the field to be activated
-        series_n (int): number of the scalar field.
-        ve (float): Vertical Exaggeration
-        kwargs_plot_structured_grid:
-        kwargs_plot_topography:
-        **kwargs:
+            model (:class:`gempy.core.model.Project`): Container class of all
+            objects that constitute a GemPy model.
+            plotter_type: PyVista plotter types. Supported plotters are:
+            'basic', 'background', and 'notebook'.
+            show_data (bool): Show original input data. Defaults to True.
+            show_results (bool): If False, override show lith, show_scalar, show_values
+            show_lith (bool): Show lithological block volumes. Defaults to True.
+            show_scalar (bool): Show scalar field isolines. Defaults to False.
+            show_boundaries (bool): Show surface boundaries as lines. Defaults to True.
+            show_topography (bool): Show topography on plot. Defaults to False.
+            scalar_field (str): Name of the field to be activated
+            series_n (int): number of the scalar field.
+            ve (float): Vertical Exaggeration
+            kwargs_plot_structured_grid:
+            kwargs_plot_topography:
+            **kwargs:
 
-    Returns:
-        :class:`gempy.plot.vista.GemPyToVista`
+        Returns:
+            :class:`gempy.plot.vista.GemPyToVista`
 
-    """
-    if image is True:
-        off_screen = True
-        kwargs['off_screen'] = True
-        plotter_type = 'basic'
-    if show_results is False:
-        show_surfaces = False
-        show_scalar = False
-        show_lith = False
+        """
+    
+        if image is True:
+            off_screen = True
+            kwargs['off_screen'] = True
+            plotter_type = 'basic'
+        if show_results is False:
+            show_surfaces = False
+            show_scalar = False
+            show_lith = False
 
-    if kwargs_plot_topography is None:
-        kwargs_plot_topography = dict()
-    if kwargs_plot_structured_grid is None:
-        kwargs_plot_structured_grid = dict()
-    if kwargs_plot_data is None:
-        kwargs_plot_data = dict()
+        if kwargs_plot_topography is None:
+            kwargs_plot_topography = dict()
+        if kwargs_plot_structured_grid is None:
+            kwargs_plot_structured_grid = dict()
+        if kwargs_plot_data is None:
+            kwargs_plot_data = dict()
 
-    fig_path: str = kwargs.get('fig_path', None)
+        fig_path: str = kwargs.get('fig_path', None)
 
-    gpv = GemPyToVista(model, plotter_type=plotter_type, **kwargs)
-    if show_surfaces and len(model.solutions.vertices) != 0:
-        gpv.plot_surfaces()
-    if show_lith is True and model.solutions.lith_block.shape[0] != 0:
-        gpv.plot_structured_grid('lith', **kwargs_plot_structured_grid)
-    if show_scalar is True and model.solutions.scalar_field_matrix.shape[0] != 0:
-        gpv.plot_structured_grid("scalar", series=scalar_field)
+        gpv = GemPyToVista(model, plotter_type=plotter_type, **kwargs)
+        if show_surfaces and len(model.solutions.vertices) != 0:
+            gpv.plot_surfaces()
+        if show_lith is True and model.solutions.lith_block.shape[0] != 0:
+            gpv.plot_structured_grid('lith', **kwargs_plot_structured_grid)
+        if show_scalar is True and model.solutions.scalar_field_matrix.shape[0] != 0:
+            gpv.plot_structured_grid("scalar", series=scalar_field)
 
-    if show_data:
-        gpv.plot_data(**kwargs_plot_data)
+        if show_data:
+            gpv.plot_data(**kwargs_plot_data)
 
-    if show_topography and model._grid.topography is not None:
-        gpv.plot_topography(**kwargs_plot_topography)
+        if show_topography and model._grid.topography is not None:
+            gpv.plot_topography(**kwargs_plot_topography)
 
-    if ve is not None:
-        gpv.p.set_scale(zscale=ve)
+        if ve is not None:
+            gpv.p.set_scale(zscale=ve)
 
-    if fig_path is not None:
-        gpv.p.show(screenshot=fig_path)
+        if fig_path is not None:
+            gpv.p.show(screenshot=fig_path)
 
-    if image is True:
-        img = gpv.p.show(screenshot=True)
-        img = gpv.p.last_image
-        plt.imshow(img[1])
-        plt.axis('off')
-        plt.show(block=False)
-        gpv.p.close()
+        if image is True:
+            img = gpv.p.show(screenshot=True)
+            img = gpv.p.last_image
+            plt.imshow(img[1])
+            plt.axis('off')
+            plt.show(block=False)
+            gpv.p.close()
 
-    if off_screen is False:
-        gpv.p.show()
+        if off_screen is False:
+            gpv.p.show()
 
-    return gpv
+        return gpv
 
 # if PYVISTA_IMPORT:
 #     def plot_3d(
