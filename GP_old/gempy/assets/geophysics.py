@@ -16,10 +16,28 @@
 """
 
 import numpy as np
-import theano
-import theano.tensor as T
 from gempy.core.grid_modules.grid_types import CenteredGrid,RegularGrid
 
+class Receivers(object):
+    '''
+        X_r = np.linspace(0,1000,10)
+        Y_r = np.linspace(0,1000,10)
+
+        r = []
+        for x in X_r:
+            for y in Y_r:
+            r.append(np.array([x,y]))
+        receivers = np.array(r)
+        Z_r = 200
+        n_devices = receivers.shape[0]
+        xyz = np.meshgrid(X_r, Y_r, Z_r)
+        xy_ravel = np.vstack(list(map(np.ravel, xyz))).T
+    '''
+    def __init__(self,radius,extent,xy_ravel):
+        self.extent = extent
+        self.xy_ravel = xy_ravel
+        self.n_devices = len(self.xy_ravel)
+        self.model_radius = radius
 
 class GravityPreprocessing(CenteredGrid):
     def __init__(self, centered_grid: CenteredGrid = None):
@@ -79,36 +97,38 @@ class GravityPreprocessingRegAllLoop(RegularGrid):
     @Zhouji Liang
 
     """
-    def __init__(self, model, regular_grid: RegularGrid = None):
+    def __init__(self, receivers:Receivers , regular_grid: RegularGrid = None):
 
         if regular_grid is None:
             super().__init__()
         elif isinstance(regular_grid, RegularGrid):
-            self.model = model
+            self.receivers = receivers
+            self.regular_grid = regular_grid
             # self.kernel_centers = np.repeat(regular_grid.values[:,:,np.newaxis],2,axis=2) - model.xy_ravel.T
             self.num_receivers = 1
+
             # self.kernel_dxyz_right = regular_grid.kernel_dxyz_right
             # self.kernel_dxyz_left = regular_grid.kernel_dxyz_left
         self.tz = np.empty(0)
 
-    def set_tz_kernel(self, model_radius,regular_grid_resolution,scale=True, **kwargs):
-        dx, dy, dz = self.model.grid.regular_grid.get_dx_dy_dz()
+    def set_tz_kernel(self, scale=True, **kwargs):
+        dx, dy, dz = self.regular_grid.get_dx_dy_dz()
 
         # we need to find the closest center for each receiver to keep numerical stability
         # here we find the smallest center which is greater than the receiver coordinates for x and y
-        range_xy = [(self.model.extent[1] - self.model.extent[0])/2,(self.model.extent[3] - self.model.extent[2])/2] 
+        range_xy = [(self.receivers.extent[1] - self.receivers.extent[0])/2,(self.receivers.extent[3] - self.receivers.extent[2])/2] 
         #center of model
-        new_xy_ravel = np.expand_dims(np.array([self.model.extent[0]+range_xy[0],self.model.extent[2]+range_xy[1]]),axis = 1)
+        new_xy_ravel = np.expand_dims(np.array([self.receivers.extent[0]+range_xy[0],self.receivers.extent[2]+range_xy[1]]),axis = 1)
 
         ################
         self.dx = dx
         self.dy = dy
         self.dz = dz
-        self.re_x = self.model.xy_ravel.T[0]
-        self.re_x = self.re_x + (dx / 2 - (self.re_x-self.model.extent[0]) % dx)
+        self.re_x = self.receivers.xy_ravel.T[0]
+        self.re_x = self.re_x + (dx / 2 - (self.re_x-self.receivers.extent[0]) % dx)
 
-        self.re_y = self.model.xy_ravel.T[1]
-        self.re_y = self.re_y + (dy / 2 - (self.re_y-self.model.extent[2]) % dy)
+        self.re_y = self.receivers.xy_ravel.T[1]
+        self.re_y = self.re_y + (dy / 2 - (self.re_y-self.receivers.extent[2]) % dy)
 
         self.new_xy_ravel = np.stack(
             [
@@ -119,35 +139,35 @@ class GravityPreprocessingRegAllLoop(RegularGrid):
         )
         # concat with z value
         self.new_xy_ravel = np.concatenate(
-            [self.new_xy_ravel, self.model.xy_ravel.T[2, None]]
+            [self.new_xy_ravel, self.receivers.xy_ravel.T[2, None]]
         )
 
         ################
         # # sensor location move to the next closest cell center
         re_x = new_xy_ravel[0]
-        re_x = re_x + (dx / 2 - (re_x-self.model.extent[0]) % dx)
+        re_x = re_x + (dx / 2 - (re_x-self.receivers.extent[0]) % dx)
 
         re_y = new_xy_ravel[1]
-        re_y = re_y + (dy / 2 - (re_y-self.model.extent[2]) % dy)
+        re_y = re_y + (dy / 2 - (re_y-self.receivers.extent[2]) % dy)
 
         # concat with z value
         new_xy_ravel_temp = np.concatenate(
-            [np.array([re_x,re_y]), np.array([[self.model.extent[-1]]])])
+            [np.array([re_x,re_y]), np.array([[self.receivers.extent[-1]]])])
 
-        self.center_index_x = (new_xy_ravel_temp[0]-self.model.extent[0])//dx
-        self.center_index_y = (new_xy_ravel_temp[1]-self.model.extent[2])//dy
-        self.radius_cell_x = int(self.model.model_radius[0]//dx)
-        self.radius_cell_y = int(self.model.model_radius[1]//dy)
+        self.center_index_x = (new_xy_ravel_temp[0]-self.receivers.extent[0])//dx
+        self.center_index_y = (new_xy_ravel_temp[1]-self.receivers.extent[2])//dy
+        self.radius_cell_x = int(self.receivers.model_radius[0]//dx)
+        self.radius_cell_y = int(self.receivers.model_radius[1]//dy)
 
-        # kernel_centers = np.repeat(self.model.grid.regular_grid.values[:,:,np.newaxis],self.num_receivers,axis=2)-self.model.xy_ravel.T
+        # kernel_centers = np.repeat(receivers.grid.regular_grid.values[:,:,np.newaxis],self.num_receivers,axis=2)-receivers.xy_ravel.T
         kernel_centers = np.squeeze(
-                self.model.grid.regular_grid.values[:, :, np.newaxis] - new_xy_ravel_temp
+                self.regular_grid.values[:, :, np.newaxis] - new_xy_ravel_temp
         )
 
         c_x = int(self.center_index_x[0])
         c_y = int(self.center_index_y[0])
 
-        slice_kernel_centers = (kernel_centers[:,:].reshape(self.model.regular_grid_resolution+[3,self.num_receivers])[c_x-self.radius_cell_x:c_x+self.radius_cell_x+1,c_y-self.radius_cell_y:c_y+self.radius_cell_y+1,:,:]).reshape([-1,3])
+        slice_kernel_centers = (kernel_centers[:,:].reshape(self.regular_grid.resolution.tolist()+[3,self.num_receivers])[c_x-self.radius_cell_x:c_x+self.radius_cell_x+1,c_y-self.radius_cell_y:c_y+self.radius_cell_y+1,:,:]).reshape([-1,3])
 
 
         x_cor = np.stack(
@@ -163,7 +183,7 @@ class GravityPreprocessingRegAllLoop(RegularGrid):
         # ...and prepare them for a vectorial op
         x_matrix = np.repeat(x_cor, 4, axis=1)
         y_matrix = np.tile(np.repeat(y_cor, 2, axis=1), (1, 2))
-        z_matrix = np.tile(z_cor, (1, 4)) - 0.005 * (self.model.extent[-1]-self.model.extent[-2])
+        z_matrix = np.tile(z_cor, (1, 4)) - 0.005 * (self.receivers.extent[-1]-self.receivers.extent[-2])
 
         s_r = np.sqrt(x_matrix ** 2 + y_matrix ** 2 + z_matrix ** 2)
 

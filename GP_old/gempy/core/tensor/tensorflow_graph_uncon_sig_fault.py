@@ -12,7 +12,7 @@ class TFGraph(tf.Module):
 
     def __init__(self, input,
                  fault_drift, grid, values_properties,nugget_effect_grad,nugget_effect_scalar,
-                Range, C_o, rescalefactor,slope=50, output=None,sigmoid=False, **kwargs):
+                Range, C_o, rescalefactor,slope=50, output=None,sigmoid=False,compute_gravity = False, **kwargs):
         super(TFGraph, self).__init__()
         
         (self.number_of_points_per_surface_T,
@@ -31,7 +31,7 @@ class TFGraph(tf.Module):
         self.mask_matrix,
         self.block_matrix) = input
         
-
+        self.compute_gravity_flag = compute_gravity
         self.dtype = kwargs.get('dtype', tf.float32)
         self.lengh_of_faults = tf.constant(0, dtype=tf.int32)
 
@@ -888,11 +888,12 @@ class TFGraph(tf.Module):
         block = self.export_formation_block(Z_x, scalar_field_at_surface_points, value_properties[:,
                                    n_form_per_serie_0: n_form_per_serie_1 + 1])
         self.block = block
-        # tf.print(tf.slice(block,[0,0],[1,-1]))
+
         ## In theano, this is done by set_subtensor, because tensor does not allow tensor assignment, here I use concat
         self.block_matrix = tf.concat([self.block_matrix,tf.slice(block,[0,0],[1,-1])],axis=0)
         self.fault_matrix = tf.concat([self.fault_matrix,tf.slice(block,[0,0],[1,-1])],axis=0)
-        # self.property_matrix = tf.concat([self.property_matrix,tf.slice(block,[1,0],[1,-1])],axis=0)
+        if self.compute_gravity_flag == True and value_properties.shape[0]>1:
+            self.property_matrix = tf.concat([self.property_matrix,tf.slice(block,[1,0],[1,-1])],axis=0)
         self.mask_matrix = tf.concat([self.mask_matrix,mask_e],axis=0)
         
         self.scalar_matrix = tf.concat([self.scalar_matrix,tf.expand_dims(Z_x,axis=0)],axis=0)
@@ -913,8 +914,10 @@ class TFGraph(tf.Module):
 
         # idx_e = tf.math.logical_or(self.is_fault,faults_relation_op)[:self.is_erosion.shape[0]]
 
-        
-        # return self.block_matrix,self.property_matrix,self.mask_matrix,Z_x
+        if self.compute_gravity_flag == True and value_properties.shape[0]>1:
+            return self.block_matrix,self.property_matrix, weights, Z_x, sfai, self.mask_matrix, \
+              fault_matrix, nsle
+
         return self.block_matrix, weights, Z_x, sfai, self.mask_matrix, \
               fault_matrix, nsle
 
@@ -949,9 +952,28 @@ class TFGraph(tf.Module):
         # self.block_matrix = tf.zeros([num_series,tf.shape(self.grid_val)[0]+2*self.len_points] )
         # self.mask_matrix = tf.zeros([num_series,tf.shape(self.grid_val)[0]+2*self.len_points] )
         for i in range(num_series):
-
+          if self.compute_gravity_flag == True and value_properties.shape[0]>1:
+            block_matrix,property_matrix, weights_vector, Z_x, sfai, mask_matrix, fault_matrix, nsle= self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
+                                                                          len_i_0=self.len_series_i[i], len_i_1=self.len_series_i[i+1],
+                  len_f_0=self.len_series_o[i], len_f_1=self.len_series_o[i+1],
+                  len_w_0=self.len_series_w[i], len_w_1=self.len_series_w[i+1],
+                  n_form_per_serie_0=self.n_surfaces_per_series[i], n_form_per_serie_1=self.n_surfaces_per_series[i+1],
+                  u_grade_iter=3,
+                  compute_weight_ctr=np.array(True),
+                  compute_scalar_ctr=np.array(True),
+                  compute_block_ctr=np.array(True),
+                  is_finite=np.array(False), is_erosion=self.is_erosion[i],
+                  is_onlap=np.array(False),
+                  n_series=i,
+                  range=10., c_o=10.,
+                  block_matrix=None, weights_vector=None,
+                  scalar_field_matrix=None, sfai=None, mask_matrix=None,
+                #   mask_matrix_f=None, fault_matrix=None,
+                  nsle=0, grid=None,
+                  shift=None)
         #   block_matrix,property_matrix,mask_matrix,Z_x= self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
-          block_matrix, weights_vector, Z_x, sfai, mask_matrix, fault_matrix, nsle= self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
+          else:
+            block_matrix, weights_vector, Z_x, sfai, mask_matrix, fault_matrix, nsle= self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
                                                                           len_i_0=self.len_series_i[i], len_i_1=self.len_series_i[i+1],
                   len_f_0=self.len_series_o[i], len_f_1=self.len_series_o[i+1],
                   len_w_0=self.len_series_w[i], len_w_1=self.len_series_w[i+1],
@@ -979,15 +1001,29 @@ class TFGraph(tf.Module):
           block_mask = tf.concat([mask_matrix[-1:],last_series_mask],axis=0)
           block_mask = mask_matrix*block_mask
           final_block = tf.reduce_sum(tf.where(block_mask==1,block_matrix,0),0)
-        #   final_property= tf.reduce_sum(tf.where(block_mask==1,property_matrix,0),0)
+          if self.compute_gravity_flag == True:
+            final_property= tf.reduce_sum(tf.where(block_mask==1,property_matrix,0),0)
         else:
           last_series_mask = 1-mask_matrix[:-1]
           block_mask = tf.concat([mask_matrix[-1:],last_series_mask],axis=0)
           block_mask = mask_matrix*block_mask
           final_block = tf.reduce_sum(block_mask*block_matrix,0)
-        #   final_property= tf.reduce_sum(block_mask*property_matrix,0)
+          if self.compute_gravity_flag == True:
+            final_property= tf.reduce_sum(block_mask*property_matrix,0)
         
         # return final_block,final_property,block_mask
+        if self.compute_gravity_flag == True:
+
+            return [final_block,
+                    final_property,
+                    block_matrix,
+                    # fault_block,
+                    weights_vector,
+                    Z_x,
+                    sfai,
+                    block_mask,
+                    fault_matrix]
+
         return [final_block,
                 block_matrix,
                 # fault_block,
@@ -996,4 +1032,3 @@ class TFGraph(tf.Module):
                 sfai,
                 block_mask,
                 fault_matrix]
-

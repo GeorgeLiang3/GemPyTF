@@ -4,6 +4,8 @@ import tensorflow as tf
 from gempy.core.tensor.tensorflow_graph_uncon_sig_fault import TFGraph
 from gempy.core.solution import Solution
 from gempy.core.model import DataMutation
+from gempy.assets.geophysics import *
+from gempy.core.grid_modules.grid_types import CenteredRegGrid
 
 class ModelTF(DataMutation):
     def __init__(self,geo_data) -> None:
@@ -94,10 +96,22 @@ class ModelTF(DataMutation):
     def activate_regular_grid(self,):
         self.geo_data.grid.deactivate_all_grids()
         self.geo_data.grid.set_active(['regular'])
-        self.geo_data.grid.set_active(['sections'])
+        # self.geo_data.grid.set_active(['sections'])
         self.geo_data.update_from_grid()
         self.grid = self.geo_data.grid
         self.from_gempy_interpolator()
+
+    def activate_customized_grid(self,grid_kernel):
+        self.geo_data.grid.custom_grid=grid_kernel
+        self.geo_data.grid.deactivate_all_grids()
+        # activate also rescaled the grid
+        self.geo_data.grid.set_active('custom')
+
+        self.geo_data.update_from_grid()
+        self.geo_data.rescaling.set_rescaled_grid()
+        self.grid = self.geo_data.grid
+        self.from_gempy_interpolator()
+
         
 
     def rescale_coord(self,surface_points_xyz):
@@ -303,17 +317,17 @@ class ModelTF(DataMutation):
                 mask_matrix,
                 block_matrix]
     
-    def create_tensorflow_graph(self, input, gradient = False):
+    def create_tensorflow_graph(self, input, gradient = False,compute_gravity = False):
         self.TFG = TFGraph(input, self.fault_drift,
                 self.grid_tensor, self.values_properties, self.nugget_effect_grad,self.nugget_effect_scalar, self.Range,
-                self.C_o, self.rescale_factor,slope = 1000000, dtype = self.tfdtype, gradient = gradient)
+                self.C_o, self.rescale_factor,slope = 1000000, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity)
     
     # def calculate_grav(self,surface_coord, values_properties):
         
     
     def compute_model(self,surface_points = None,gradient = False):
-        input = self.get_graph_input()
-        self.create_tensorflow_graph(input,gradient)
+        gpinput = self.get_graph_input()
+        self.create_tensorflow_graph(gpinput,gradient)
         if surface_points is None:
             surface_points = self.surface_points_coord
         final_block,block_matrix,weights_vector,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
@@ -348,3 +362,66 @@ class ModelTF(DataMutation):
         self.solutions.compute_all_surfaces()
 
         self.set_surface_order_from_solution()
+
+    
+    def compute_gravity(self,receivers,surface_points = None,gradient = False,method = None,window_resolution = None):
+
+        implemented_methods_lst = ['conv_all','kernel_reg','kernel_geom','kernel_ml']
+        if method in implemented_methods_lst: 
+            pass   
+        else: 
+            print("The method is not implemented.")
+
+        if surface_points is None:
+            surface_points = self.surface_points_coord
+        if method == 'conv_all':
+            self.activate_regular_grid()
+            gpinput = self.get_graph_input()
+            self.create_tensorflow_graph(gpinput,gradient,compute_gravity=True)
+            g = GravityPreprocessingRegAllLoop(receivers,self.geo_data.grid.regular_grid)
+            tz = g.set_tz_kernel()
+            size = tf.reduce_prod(self.geo_data.grid.regular_grid.resolution)
+            final_block,final_property,block_matrix,weights_vector,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
+                        self.dips_position,
+                        self.dip_angles,
+                        self.azimuth,
+                        self.polarity,
+                        self.values_properties)
+
+            densities = final_property[0:size] # slice the density by resolution
+
+
+            center_index_x = (g.new_xy_ravel[0]-receivers.extent[0])//g.dx
+            center_index_y = (g.new_xy_ravel[1]-receivers.extent[2])//g.dy
+            grav_convolution_full = tf.TensorArray(self.tfdtype, size=receivers.n_devices, dynamic_size=False, clear_after_read=True)
+            for i in range(receivers.n_devices):
+                c_x = int(center_index_x[i])
+                c_y = int(center_index_y[i])
+
+                windowed_densities = tf.reshape(densities,self.geo_data.grid.regular_grid.resolution)[c_x-g.radius_cell_x:c_x+g.radius_cell_x+1,c_y-g.radius_cell_y:c_y+g.radius_cell_y+1,:]
+                windowed_densities = tf.squeeze(tf.reshape(windowed_densities,(-1,1)))
+                grav_ = self.TFG.compute_forward_gravity(tf.constant(tz,self.tfdtype), 0, size, windowed_densities)
+                grav_convolution_full = grav_convolution_full.write(i, grav_)
+            grav_convolution_full = tf.squeeze(grav_convolution_full.stack())            
+            return grav_convolution_full
+
+        if method == 'kernel_reg':
+            
+            centerReg_kernel = CenteredRegGrid(receivers.xy_ravel,radius=receivers.model_radius,resolution=window_resolution)
+            self.activate_customized_grid(centerReg_kernel)
+            gpinput = self.get_graph_input()
+            self.create_tensorflow_graph(gpinput,gradient,compute_gravity=True)
+            g_center_regulargrid = GravityPreprocessing(centerReg_kernel)
+            tz_center_regulargrid = tf.constant(g_center_regulargrid.set_tz_kernel(),self.tfdtype)
+
+            final_block,final_property,block_matrix,weights_vector,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
+                        self.dips_position,
+                        self.dip_angles,
+                        self.azimuth,
+                        self.polarity,
+                        self.values_properties)
+            size = centerReg_kernel.values.shape[0]
+            densities = final_property[:size]
+
+            gravity_center_reg = self.TFG.compute_forward_gravity(tz_center_regulargrid, 0, size, densities)
+            return gravity_center_reg
