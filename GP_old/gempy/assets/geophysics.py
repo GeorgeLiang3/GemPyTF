@@ -33,11 +33,13 @@ class Receivers(object):
         xyz = np.meshgrid(X_r, Y_r, Z_r)
         xy_ravel = np.vstack(list(map(np.ravel, xyz))).T
     '''
-    def __init__(self,radius,extent,xy_ravel):
+    def __init__(self,radius,extent,xy_ravel,**kwargs):
         self.extent = extent
         self.xy_ravel = xy_ravel
         self.n_devices = len(self.xy_ravel)
         self.model_radius = radius
+        if 'grav_res' in kwargs:
+            self.grav_res = kwargs['grav_res']
 
 class GravityPreprocessing(CenteredGrid):
     def __init__(self, centered_grid: CenteredGrid = None):

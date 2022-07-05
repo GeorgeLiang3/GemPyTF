@@ -399,3 +399,47 @@ if PYVISTA_IMPORT:
 
 #         gpv.show()
 #         return gpv
+
+
+# %%
+# from gempy.plot.visualization_2d_pro import *
+
+def plot_grav(model,receivers,grav_diff,diff = True, ax = None, subplots =False,**kwargs):
+  '''
+  grav_diff = grav.numpy().reshape(grav_res,grav_res)
+  '''
+  p = Plot2D(model)
+  if ax is None:
+    ax = plt.gca()
+  f = plt.gcf()
+  if 'figsize' in kwargs:
+    f.set_size_inches(kwargs['figsize'])
+  # f = plt.figure(**kwargs)
+  ax.set_ylim(receivers.extent[2],receivers.extent[3])
+  ax.set_xlim(receivers.extent[0],receivers.extent[1])
+  ax.set_ylabel('Y')
+  ax.set_xlabel('X')
+  if diff is True:
+    vmin = -3
+    vmax = 3
+  else: 
+    vmin=None
+    vmax=None
+    ax.scatter(receivers.xy_ravel[:,0],receivers.xy_ravel[:,1],s=10)
+
+  ax.yaxis.set_tick_params(rotation=90)
+  p.plot_contacts(ax,cell_number=[-1], direction='z')
+  im = ax.imshow(grav_diff,
+            vmin = vmin, vmax = vmax,
+            extent=(receivers.xy_ravel[:, 0].min() + (receivers.xy_ravel[0, 0] - receivers.xy_ravel[1, 0]) / 2,
+                   receivers.xy_ravel[:, 0].max() - (receivers.xy_ravel[0, 0] - receivers.xy_ravel[1, 0]) / 2,
+                   receivers.xy_ravel[:, 1].min() + (receivers.xy_ravel[0, 1] - receivers.xy_ravel[receivers.grav_res, 1]) / 2,
+                   receivers.xy_ravel[:, 1].max() - (receivers.xy_ravel[0, 1] - receivers.xy_ravel[receivers.grav_res, 1]) / 2),
+            origin='lower',cmap='twilight_shifted')
+  if subplots is True:
+    return im
+  f.subplots_adjust(right=0.4)
+  
+  cbar = f.colorbar(im)
+  cbar.set_label(r'$mgal$',rotation=270,labelpad=19)
+  return f, ax

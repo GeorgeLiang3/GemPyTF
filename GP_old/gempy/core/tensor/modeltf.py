@@ -326,6 +326,7 @@ class ModelTF(DataMutation):
         
     
     def compute_model(self,surface_points = None,gradient = False):
+        self.activate_regular_grid()
         gpinput = self.get_graph_input()
         self.create_tensorflow_graph(gpinput,gradient)
         if surface_points is None:
