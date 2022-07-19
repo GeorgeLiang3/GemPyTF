@@ -317,10 +317,10 @@ class ModelTF(DataMutation):
                 mask_matrix,
                 block_matrix]
     
-    def create_tensorflow_graph(self, input, gradient = False,compute_gravity = False):
+    def create_tensorflow_graph(self, input, slope = 100000, gradient = False,compute_gravity = False):
         self.TFG = TFGraph(input, self.fault_drift,
                 self.grid_tensor, self.values_properties, self.nugget_effect_grad,self.nugget_effect_scalar, self.Range,
-                self.C_o, self.rescale_factor,slope = 1000000, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity)
+                self.C_o, self.rescale_factor,slope = slope, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity)
     
     # def calculate_grav(self,surface_coord, values_properties):
         
@@ -365,22 +365,18 @@ class ModelTF(DataMutation):
         self.set_surface_order_from_solution()
 
     
-    def compute_gravity(self,receivers,surface_points = None,gradient = False,method = None,window_resolution = None):
+    def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,gradient = False,Hessian = False,method = None,window_resolution = None,test = False):
 
         implemented_methods_lst = ['conv_all','kernel_reg','kernel_geom','kernel_ml']
         if method in implemented_methods_lst: 
             pass   
         else: 
-            print("The method is not implemented.")
+            raise NotImplementedError
 
         if surface_points is None:
             surface_points = self.surface_points_coord
         if method == 'conv_all':
-            self.activate_regular_grid()
-            gpinput = self.get_graph_input()
-            self.create_tensorflow_graph(gpinput,gradient,compute_gravity=True)
-            g = GravityPreprocessingRegAllLoop(receivers,self.geo_data.grid.regular_grid)
-            tz = g.set_tz_kernel()
+
             size = tf.reduce_prod(self.geo_data.grid.regular_grid.resolution)
             final_block,final_property,block_matrix,weights_vector,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
                         self.dips_position,
@@ -390,30 +386,24 @@ class ModelTF(DataMutation):
                         self.values_properties)
 
             densities = final_property[0:size] # slice the density by resolution
-
-
-            center_index_x = (g.new_xy_ravel[0]-receivers.extent[0])//g.dx
-            center_index_y = (g.new_xy_ravel[1]-receivers.extent[2])//g.dy
+            center_index_x = tf.constant((g.new_xy_ravel[0]-receivers.extent[0])//g.dx,self.tfdtype)
+            center_index_y = tf.constant((g.new_xy_ravel[1]-receivers.extent[2])//g.dy,self.tfdtype)
             grav_convolution_full = tf.TensorArray(self.tfdtype, size=receivers.n_devices, dynamic_size=False, clear_after_read=True)
-            for i in range(receivers.n_devices):
-                c_x = int(center_index_x[i])
-                c_y = int(center_index_y[i])
+            for i in tf.range(receivers.n_devices):
+                c_x = tf.cast(center_index_x[i],tf.int32)
+                c_y = tf.cast(center_index_y[i],tf.int32)
 
                 windowed_densities = tf.reshape(densities,self.geo_data.grid.regular_grid.resolution)[c_x-g.radius_cell_x:c_x+g.radius_cell_x+1,c_y-g.radius_cell_y:c_y+g.radius_cell_y+1,:]
                 windowed_densities = tf.squeeze(tf.reshape(windowed_densities,(-1,1)))
-                grav_ = self.TFG.compute_forward_gravity(tf.constant(tz,self.tfdtype), 0, size, windowed_densities)
+                grav_ = self.TFG.compute_forward_gravity(tz, 0, size, windowed_densities)
                 grav_convolution_full = grav_convolution_full.write(i, grav_)
-            grav_convolution_full = tf.squeeze(grav_convolution_full.stack())            
-            return grav_convolution_full
+            grav = tf.squeeze(grav_convolution_full.stack())
+            
+            self.solutions.lith_block = final_block.numpy()
+
 
         if method == 'kernel_reg':
-            
-            centerReg_kernel = CenteredRegGrid(receivers.xy_ravel,radius=receivers.model_radius,resolution=window_resolution)
-            self.activate_customized_grid(centerReg_kernel)
-            gpinput = self.get_graph_input()
-            self.create_tensorflow_graph(gpinput,gradient,compute_gravity=True)
-            g_center_regulargrid = GravityPreprocessing(centerReg_kernel)
-            tz_center_regulargrid = tf.constant(g_center_regulargrid.set_tz_kernel(),self.tfdtype)
+
 
             final_block,final_property,block_matrix,weights_vector,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
                         self.dips_position,
@@ -421,8 +411,37 @@ class ModelTF(DataMutation):
                         self.azimuth,
                         self.polarity,
                         self.values_properties)
-            size = centerReg_kernel.values.shape[0]
+            size = kernel.values.shape[0]
             densities = final_property[:size]
 
-            gravity_center_reg = self.TFG.compute_forward_gravity(tz_center_regulargrid, 0, size, densities)
-            return gravity_center_reg
+            grav = self.TFG.compute_forward_gravity(tz, 0, size, densities)
+        if test == False:
+            return grav_convolution_full
+        else:
+            return final_block,final_property,block_matrix,block_mask,size,Z_x,grav
+    
+    def set_solutions(self,sol):
+        final_block,final_property,block_matrix,block_mask,size,Z_x,grav = sol
+        self.grid = self._grid
+        if self._grid.active_grids[0] == True:
+            regular = self._grid.get_grid_args('regular')
+            self.solutions.lith_block = (final_block[regular[0]:regular[1]]).numpy()
+
+        
+        self.solutions.values_matrix = final_property[:size].numpy()
+        self.solutions.scalar_field_matrix = self.TFG.scalar_matrix[:,regular[0]:regular[1]].numpy()
+        self.solutions.mask_matrix = block_mask[:,regular[0]:regular[1]].numpy()>0
+        self.solutions.scalar_field_at_surface_points = self.TFG.sfai.numpy()
+        self.solutions._grid = self._grid
+        self.solutions.grid = self._grid
+        self.solutions.block_matrix = block_matrix[:,regular[0]:regular[1]].numpy()
+        
+        l0, l1 = self.solutions.grid.get_grid_args('sections')
+        # print('formation_block',formation_block[l0: l1])
+        # print('scalar_matrix',self.TFG.scalar_matrix[:, l0: l1])
+        self.solutions.sections = np.array(
+            [final_block[l0: l1].numpy(), self.TFG.scalar_matrix[:, l0: l1].numpy().astype(float)])
+        
+        self.solutions.compute_all_surfaces()
+
+        self.set_surface_order_from_solution()

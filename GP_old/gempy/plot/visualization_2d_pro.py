@@ -25,12 +25,14 @@ Created on 23/09/2019
 
 import warnings
 import os
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.ticker import FixedFormatter, FixedLocator
 import matplotlib.gridspec as gridspect
-
+import matplotlib as mpl
+import scipy.spatial.distance as dd
 
 import seaborn as sns
 from os import path
@@ -240,16 +242,17 @@ class Plot2D:
 
         return section_name, cell_number, direction
 
-    def plot_lith(self, ax, section_name=None, cell_number=None, direction='y',
-                  block=None, mask=None, **kwargs):
-        """
+
+    def plot_regular_grid(self, ax, section_name=None, cell_number=None, direction='y',
+                          block: np.ndarray = None, resolution=None, **kwargs):
+        """Generic function to plot all regular data
 
         Args:
+            block:
             section_name:
             cell_number:
             direction:
             ax:
-            extent_val:
             **kwargs: imshow kwargs
 
         Returns:
@@ -257,52 +260,62 @@ class Plot2D:
         """
         self.update_colot_lot()
         extent_val = [*ax.get_xlim(), *ax.get_ylim()]
-        print(extent_val)
+        if 'cmap' in kwargs:
+            cmap = kwargs['cmap']
+        else:
+            cmap = self.cmap
+        if 'norm' in kwargs:
+            norm = kwargs['norm']
+        else:
+            norm = self.norm
+
         section_name, cell_number, direction = self._check_default_section(ax, section_name, cell_number, direction)
 
         if section_name is not None:
             if section_name == 'topography':
                 try:
                     image = self.model.solutions.geological_map[0].reshape(
-                        self.model.grid.topography.values_3D[:, :, 2].shape)
-                    #mask = self.model.solutions.geological_map[4].reshape(
-                    #    self.model.grid.topography.values_3D[:, :, 2].shape)
+                        self.model._grid.topography.values_2d[:, :, 2].shape).T
+
                 except AttributeError:
                     raise AttributeError('Geological map not computed. Activate the topography grid.')
             else:
-                assert type(section_name) == str or type(section_name) == np.str_, 'section name must be a string of the name of the section'
+                assert type(section_name) == str or type(
+                    section_name) == np.str_, 'section name must be a string of the name of the section'
                 assert self.model.solutions.sections is not None, 'no sections for plotting defined'
 
-                l0, l1 = self.model.grid.sections.get_section_args(section_name)
-                shape = self.model.grid.sections.df.loc[section_name, 'resolution']
-                image = self.model.solutions.sections[0][l0:l1].reshape(shape[0], shape[1]).T
-                #mask = self.model.solutions.sections[0].reshape(shape[0], shape[1]).T
+                l0, l1 = self.model._grid.sections.get_section_args(section_name)
+                shape = self.model._grid.sections.df.loc[section_name, 'resolution']
+                image = self.model.solutions.sections[0][0][l0:l1].reshape(shape[0], shape[1]).T
 
         elif cell_number is not None or block is not None:
             _a, _b, _c, _, x, y = self._slice(direction, cell_number)[:-2]
-            if block is None:
-                _block = self.model.solutions.lith_block
-            else:
-                _block = block
+            if resolution is None:
+                resolution = self.model._grid.regular_grid.resolution
 
-            if mask is None:
-                _mask = self.model.solutions.mask_matrix
-            else:
-                _mask = mask
-
-            plot_block = _block.reshape(self.model.grid.regular_grid.resolution)
-            image = np.squeeze(plot_block[_a, _b, _c].T)
-            # mask = _mask.reshape(-1, *self.model.grid.regular_grid.resolution)[:, _a, _b, _c]
+            plot_block = block.reshape(self.model._grid.regular_grid.resolution)
+            image = plot_block[_a, _b, _c].T
         else:
             raise AttributeError
-        # for mask_series in mask:
-        #     image_series = np.ma.array(image, mask = ~mask_series.T)
-        #     ax.imshow(image_series, origin='lower', zorder=-100,
-        #               cmap=self.cmap, norm=self.norm, extent=extent_val)
-        #
+        
         ax.imshow(image, origin='lower', zorder=-100,
-                  cmap=self.cmap, norm=self.norm, extent=extent_val)
+                  cmap=cmap, norm=norm, extent=extent_val)
         return ax
+    def plot_lith(self, ax, section_name=None, cell_number=None, direction='y', **kwargs):
+        block = self.model.solutions.lith_block
+        self.plot_regular_grid(ax, section_name, cell_number, direction, block=block)
+
+    def plot_values(self, ax, series_n=0, section_name=None, cell_number=None,
+                    direction='y', **kwargs):
+        block = self.model.solutions.values_matrix[series_n]
+        self.plot_regular_grid(ax, section_name, cell_number, direction, block=block,
+                               **kwargs)
+
+    def plot_block(self, ax, series_n=0, section_name=None, cell_number=None, direction='y',
+                   **kwargs):
+        block = self.model.solutions.block_matrix[series_n]
+        self.plot_regular_grid(ax, section_name, cell_number, direction, block=block)
+ 
 
     def plot_scalar_field(self, ax, section_name=None, cell_number=None, sn=0, direction='y',
                           block=None, **kwargs):
@@ -371,7 +384,10 @@ class Plot2D:
 
         """
         # self.update_colot_lot()
+        if projection_distance is None:
+            projection_distance = 0.2 * self.model._rescaling.df['rescaling factor'].values[0]
 
+        self.update_colot_lot()
         points = self.model.surface_points.df.copy()
         orientations = self.model.orientations.df.copy()
         section_name, cell_number, direction = self._check_default_section(ax, section_name, cell_number, direction)
@@ -444,15 +460,31 @@ class Plot2D:
         select_projected_p = cartesian_point_dist < projection_distance
         select_projected_o = cartesian_ori_dist < projection_distance
 
+        # if self.fig.is_legend is False and legend is True or legend == 'force':
+        #     make_legend = 'full'
+        #     self.fig.is_legend = True
+        # Hack to keep the right X label:
+        temp_label = copy.copy(ax.xaxis.label)
+
+        points_df = points[select_projected_p]
+        points_df['colors'] = points_df['surface'].map(self._color_lot)
+
+        points_df.plot.scatter(x=x, y=y, ax=ax, c=points_df['surface'].map(self._color_lot),
+                               s=70,  zorder=102, edgecolors='white',
+                               colorbar=False)
         if self.fig.is_legend is False and legend is True or legend == 'force':
-            make_legend = 'full'
+
+            markers = [plt.Line2D([0, 0], [0, 0], color=color, marker='o',
+                                  linestyle='') for color in
+                       self._color_lot.values()]
+            ax.legend(markers, self._color_lot.keys(), numpoints=1)
             self.fig.is_legend = True
+        ax.xaxis.label = temp_label
+        # else:
+        #     make_legend = None
 
-        else:
-            make_legend = None
-
-        sns.scatterplot(data=points[select_projected_p], x=x, y=y, hue='surface', ax=ax, legend=make_legend,
-                        palette=self._color_lot, zorder=101)
+        # sns.scatterplot(data=points[select_projected_p], x=x, y=y, hue='surface', ax=ax, legend=make_legend,
+        #                 palette=self._color_lot, zorder=101)
 
         sel_ori = orientations[select_projected_o]
 
@@ -466,6 +498,7 @@ class Plot2D:
 
         try:
             ax.legend_.set_frame_on(True)
+            ax.legend_.set_zorder(10000)
         except AttributeError:
             pass
 

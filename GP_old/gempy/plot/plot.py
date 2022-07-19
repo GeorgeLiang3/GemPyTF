@@ -245,7 +245,7 @@ def plot_section(model, cell_number=13, block=None, direction="y",
                  interpolation='none',
                  show_data=True, show_faults=True, show_topo=False,
                  block_type=None, ve=1,
-                 show_all_data=False, show_legend=True, **kwargs):
+                 show_all_data=False, show_legend=True,show_boundaries = False, **kwargs):
     """
     Plot a section of the block model
 
@@ -269,13 +269,15 @@ def plot_section(model, cell_number=13, block=None, direction="y",
                                        show_data, show_faults, show_topo,
                                        block_type, ve,
                                        show_all_data=show_all_data,
-                                       show_legend=show_legend, **kwargs)
+                                       show_legend=show_legend,show_boundaries=show_boundaries, **kwargs)
+    
+    
     return plot
 
 
 def plot_scalar_field(model, cell_number, N=20,
                       direction="y", block=None, alpha=0.6, show_data=True,
-                      show_all_data=False, series=0, *args, **kwargs):
+                      show_all_data=False, series=0,series_name = None, *args, **kwargs):
     """
     Plot a potential field in a given direction.
 
@@ -283,7 +285,7 @@ def plot_scalar_field(model, cell_number, N=20,
         cell_number(int): position of the array to plot
         potential_field(str): name of the potential field (or series) to plot
         n_pf(int): number of the  potential field (or series) to plot
-        direction(str): xyz. Caartesian direction to be plotted
+        direction(str): xyz. Cartesian direction to be plotted
         serie: *Deprecated*
         **kwargs: plt.contour kwargs
 
@@ -298,7 +300,7 @@ def plot_scalar_field(model, cell_number, N=20,
 
     plot.plot_scalar_field(block, cell_number, N=N,
                            direction=direction, show_data=show_data,
-                           series=series, alpha=alpha,
+                           series=series,series_name=series_name, alpha=alpha,
                            show_all_data=show_all_data,
                            *args, **kwargs)
 

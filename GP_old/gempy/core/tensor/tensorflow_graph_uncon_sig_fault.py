@@ -668,6 +668,9 @@ class TFGraph(tf.Module):
         sigm = (-tf.reshape(n_surface_0, (-1, 1)) / (1 + tf.exp(-l * (Z_x - a))))  \
             - (tf.reshape(n_surface_1, (-1, 1)) /
              (1 + tf.exp(l * (Z_x - b)))) + tf.reshape(drift, (-1, 1))
+        # print('a:',a)
+        # print('b:',b)
+
         sigm.set_shape([None, None])
         return sigm
 
@@ -706,7 +709,7 @@ class TFGraph(tf.Module):
             
             tf.autograph.experimental.set_loop_options(
                 shape_invariants=[(formations_block, tf.TensorShape([None, Z_x.shape[0]]))])
-            
+            # print('scalar_field_iter,',scalar_field_iter)
             formations_block = formations_block + \
                 self.compare(scalar_field_iter[i], scalar_field_iter[i + 1],
                              2 * i, Z_x, slope, n_surface_op_float_sigmoid, drift)
@@ -875,8 +878,8 @@ class TFGraph(tf.Module):
             mask_e = tf.where(mask_e,1,0) # convert boolean to int value for further computation -> cumprod
           else:
             # Sigmoid function between different series
-            slope = 200
-            mask_e = (1 / (1 + tf.exp(-slope * (Z_x - scalar_field_at_surface_points))))
+            slope = self.sig_slope
+            mask_e = (1 / (1 + tf.exp(-slope * (Z_x - tf.math.reduce_min(scalar_field_at_surface_points)))))
         else: 
             if self.is_fault[n_series]:
                 mask_e = tf.zeros(tf.shape(Z_x), dtype = self.mask_dtype)
@@ -918,7 +921,9 @@ class TFGraph(tf.Module):
             return self.block_matrix,self.property_matrix, weights, Z_x, sfai, self.mask_matrix, \
               fault_matrix, nsle
 
-        return self.block_matrix, weights, Z_x, sfai, self.mask_matrix, \
+        # return self.block_matrix, weights, Z_x, sfai, self.mask_matrix, \
+        #       fault_matrix, nsle
+        return self.block_matrix, weights, self.scalar_matrix, sfai, self.mask_matrix, \
               fault_matrix, nsle
 
     # @tf.function
@@ -951,7 +956,7 @@ class TFGraph(tf.Module):
 
         # self.block_matrix = tf.zeros([num_series,tf.shape(self.grid_val)[0]+2*self.len_points] )
         # self.mask_matrix = tf.zeros([num_series,tf.shape(self.grid_val)[0]+2*self.len_points] )
-        for i in range(num_series):
+        for i in tf.range(num_series):
           if self.compute_gravity_flag == True and value_properties.shape[0]>1:
             block_matrix,property_matrix, weights_vector, Z_x, sfai, mask_matrix, fault_matrix, nsle= self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
                                                                           len_i_0=self.len_series_i[i], len_i_1=self.len_series_i[i+1],
@@ -1004,7 +1009,7 @@ class TFGraph(tf.Module):
           if self.compute_gravity_flag == True:
             final_property= tf.reduce_sum(tf.where(block_mask==1,property_matrix,0),0)
         else:
-          last_series_mask = 1-mask_matrix[:-1]
+          last_series_mask = tf.math.cumprod(1-mask_matrix[:-1])
           block_mask = tf.concat([mask_matrix[-1:],last_series_mask],axis=0)
           block_mask = mask_matrix*block_mask
           final_block = tf.reduce_sum(block_mask*block_matrix,0)

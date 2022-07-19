@@ -29,8 +29,9 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from matplotlib.ticker import FixedFormatter, FixedLocator
+from matplotlib.ticker import FixedFormatter, FixedLocator,AutoMinorLocator, MultipleLocator
 import seaborn as sns
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from os import path
 import sys
 # This is for sphenix to find the packages
@@ -55,6 +56,31 @@ class PlotData2D:
         self._color_lot = dict(zip(self.model.surfaces.df['surface'], self.model.surfaces.df['color']))
         self._cmap = mcolors.ListedColormap(list(self.model.surfaces.df['color']))
         self._norm = mcolors.Normalize(vmin=0.5, vmax=len(self._cmap.colors) + 0.5)
+
+    @staticmethod
+    def _check_default_section(ax, section_name, cell_number, direction):
+
+        if section_name is None:
+            try:
+                section_name = ax.section_name
+            except AttributeError:
+                pass
+        if cell_number is None:
+            try:
+                cell_number = ax.cell_number
+                direction = ax.direction
+            except AttributeError:
+                pass
+
+        return section_name, cell_number, direction
+    
+    # def update_colot_lot(self, color_dir=None):
+    #     if color_dir is None:
+    #         color_dir = dict(zip(self.model.surfaces.df['surface'], self.model.surfaces.df['color']))
+    #     self._color_lot = color_dir
+        # if self._custom_colormap is False:
+        #     self.cmap = mcolors.ListedColormap(list(self.model.surfaces.df['color']))
+        #     self.norm = mcolors.Normalize(vmin=0.5, vmax=len(self.cmap.colors) + 0.5)
 
     def get_plot_data(self, series="all", at="everywhere", direction=None, cell_number=None, radius='default',
                       show_all_data=False):
@@ -402,6 +428,91 @@ class PlotData2D:
         mask_x = np.logical_and(pts[:, 0] >= ext[0], pts[:, 0] <= ext[1])
         mask_y = np.logical_and(pts[:, 1] >= ext[2], pts[:, 1] <= ext[3])
         return np.logical_and(mask_x, mask_y)
+    
+    def plot_contacts(self, section_name=None, cell_number=None, direction='y', block=None,
+                      only_faults=False, **kwargs):
+        ax = plt.gca()
+        # self.update_colot_lot()
+        # section_name, cell_number, direction = self._check_default_section(ax, section_name, cell_number, direction)
+
+        if only_faults:
+            contour_idx = list(self.model.faults.df[self.model.faults.df['isFault'] == True].index)
+        else:
+            contour_idx = list(self.model.surfaces.df.index)
+        extent_val = [*ax.get_xlim(), *ax.get_ylim()]
+        zorder = kwargs.get('zorder', 100)
+        alpha = kwargs.get('alpha', 1)
+        colors = kwargs.get('colors', None)
+        
+    
+        if section_name is not None:
+            if section_name == 'topography':
+                shape = self.model.grid.topography.resolution
+            #    a = self.model.solutions.geological_map_scalfield
+            #    extent = self.model.grid.topography.extent
+                scalar_fields = self.model.solutions.geological_map[1]
+                c_id = 0  # color id startpoint
+
+                for e, block in enumerate(scalar_fields):
+                    level = self.model.solutions.scalar_field_at_surface_points[e][np.where(
+                        self.model.solutions.scalar_field_at_surface_points[e] != 0)]
+
+                    c_id2 = c_id + len(level)  # color id endpoint
+                    
+                    print(colors)
+                    ax.contour(np.squeeze(block.reshape(shape)), 0, levels=np.sort(level),
+                               colors=self.cmap.colors[c_id:c_id2],
+                               linestyles='solid', origin='lower',
+                               extent=extent_val, zorder=zorder - (e + len(level))
+                               )
+                    c_id = c_id2
+
+            else:
+                l0, l1 = self.model.grid.sections.get_section_args(section_name)
+                shape = self.model.grid.sections.df.loc[section_name, 'resolution']
+                scalar_fields = self.model.solutions.sections[1][:, l0:l1]
+
+                c_id = 0  # color id startpoint
+
+                for e, block in enumerate(scalar_fields):
+                    level = self.model.solutions.scalar_field_at_surface_points[e][np.where(
+                     self.model.solutions.scalar_field_at_surface_points[e] != 0)]
+                    # Ignore warning about some scalars not being on the plot since it is very common
+                    # that an interface does not exit for a given section
+                    c_id2 = c_id + len(level)  # color id endpoint
+                    if colors is None:
+                        color_list = self.model.surfaces.df.groupby('isActive').get_group(True)['color'][c_id:c_id2][::-1]
+                    else: color_list = colors[c_id:c_id2]
+                    ax.contour(block.reshape(shape).T, 0, levels=np.sort(level),
+                               #colors=self.cmap.colors[self.model.surfaces.df['isActive']][c_id:c_id2],
+                               colors=color_list,
+                               linestyles='solid', origin='lower',
+                               extent=extent_val, zorder=zorder - (e+len(level)),
+                               alpha = alpha
+                               )
+                    c_id = c_id2
+
+        elif cell_number is not None or block is not None:
+            _slice = self._slice(direction, cell_number)[:3]
+            shape = self.model.grid.regular_grid.resolution
+            c_id = 0 # color id startpoint
+
+            for e, block in enumerate(self.model.solutions.scalar_field_matrix):
+                level = self.model.solutions.scalar_field_at_surface_points[e][np.where(
+                    self.model.solutions.scalar_field_at_surface_points[e] != 0)]
+                #c_id = e
+                c_id2 = c_id + len(level)
+            #    print(c_id, c_id2)
+
+                color_list = self.model.surfaces.df.groupby('isActive').get_group(True)['color'][c_id:c_id2][::-1]
+            #    print(color_list)
+
+                ax.contour(np.squeeze(block.reshape(shape)[_slice].T), 0, levels=np.sort(level),
+                           colors=color_list,
+                           linestyles='solid', origin='lower',
+                           extent=extent_val, zorder=zorder - (e + len(level))
+                           )
+                c_id = c_id2
 
     def plot_section_traces(self, section_names=None, contour_lines=True, show_data=True, show_all_data=False):
         if section_names is None:
@@ -783,7 +894,7 @@ class PlotSolution(PlotData2D):
 
     def plot_block_section(self, solution:Solution, cell_number:int, block:np.ndarray=None, direction:str="y",
                            interpolation:str='none', show_data:bool=False, show_faults:bool=False, show_topo:bool=False,
-                           block_type=None, ve:float=1, show_legend:bool = True, show_all_data:bool=False,
+                           block_type=None, ve:float=1, show_legend:bool = True, show_all_data:bool=False,show_boundaries:bool=False,
                            ax=None,
                            **kwargs):
         """Plot a section of the block model
@@ -854,14 +965,17 @@ class PlotSolution(PlotData2D):
             imshow_kwargs.pop('show_grid')
         if 'grid_linewidth' in imshow_kwargs:
             imshow_kwargs.pop('grid_linewidth')
-
+        if 'colorbar' in imshow_kwargs:
+            imshow_kwargs.pop('colorbar')
+        # if 'figsize' in imshow_kwargs:
+        #     imshow_kwargs.pop('figsize')
+        #     plt.figure(figsize = kwargs['figsize'])
         im = plt.imshow(sliced_block,
                         origin="lower",
                         extent=extent_val,
                         interpolation=interpolation,
                         aspect=aspect,
                         **imshow_kwargs)
-
         if extent_val[3] < extent_val[2]: # correct vertical orientation of plot
             plt.gca().invert_yaxis()    # if maximum vertical extent negative
 
@@ -881,20 +995,37 @@ class PlotSolution(PlotData2D):
             patches = [mpatches.Patch(color=color, label=surface) for surface, color in self._color_lot.items()]
             plt.legend(handles=patches, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
+        # TODO This only works fine for the y projection ?
+        ax = plt.gca();
+        ax.set_xticks(np.linspace(extent_val[0], extent_val[1], sliced_block.shape[1]+1));
+        ax.set_yticks(np.linspace(extent_val[2], extent_val[3], sliced_block.shape[0]+1));
+
+        if show_boundaries:                                       
+            self.plot_contacts( cell_number = cell_number,direction='y')
+
         if 'show_grid' in kwargs:
-            # TODO This only works fine for the y projection
-            ax = plt.gca();
-            ax.set_xticks(np.linspace(extent_val[0], extent_val[1], sliced_block.shape[0]+1));
-            ax.set_yticks(np.linspace(extent_val[2], extent_val[3], sliced_block.shape[1]+1));
+            if kwargs['show_grid']:
+                grid_linewidth = kwargs.get('grid_linewidth', 1.5)
+                ax.grid(color='w', linestyle='-', linewidth=grid_linewidth)
 
-            grid_linewidth = kwargs.get('grid_linewidth', 1)
-            ax.grid(color='w', linestyle='-', linewidth=grid_linewidth)
+                
+            # hack to turn off the tick labels to prevent too dense values
+            n = 5  # Keeps every 5th label
 
+            [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n != 0 or l._x % 100 != 0]
+            [l.set_visible(False) for (i,l) in enumerate(ax.yaxis.get_ticklabels()) if i % n != 0]
         plt.xlabel(x)
         plt.ylabel(y)
+        if 'colorbar' in kwargs:
+            if kwargs['colorbar'] is True: 
+                ax = plt.gca()
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes("right", size="5%", pad=0.05)
+                plt.colorbar(im, cax=cax)
+                # plt.colorbar(im)
         return plt.gcf()
 
-    def plot_scalar_field(self, solution, cell_number, series=0, N=20, block=None,
+    def plot_scalar_field(self, solution, cell_number, series=0,series_name = None, N=20, block=None,
                           direction="y", alpha=0.6, show_data=True, show_all_data=False,
                           *args, **kwargs):
         """
@@ -927,7 +1058,11 @@ class PlotSolution(PlotData2D):
                 at = 'everywhere'
             else:
                 at = 'block_section'
-            self.plot_data(cell_number=cell_number, direction=direction, at=at)
+            if series_name:
+                sn = series_name
+                assert (sn in self.model.surface_points.df["series"].unique()), 'exsiting series names are: {}'.format(self.model.surface_points.df["series"].unique())
+            else: sn = 'all'
+            self.plot_data(series = sn,cell_number=cell_number, direction=direction, at=at)
 
         _a, _b, _c, extent_val, x, y = self._slice(direction, cell_number)[:-2]
 

@@ -40,6 +40,8 @@ class Receivers(object):
         self.model_radius = radius
         if 'grav_res' in kwargs:
             self.grav_res = kwargs['grav_res']
+        if 'kernel_resolution' in kwargs:
+            self.kernel_resolution = kwargs['kernel_resolution'] 
 
 class GravityPreprocessing(CenteredGrid):
     def __init__(self, centered_grid: CenteredGrid = None):

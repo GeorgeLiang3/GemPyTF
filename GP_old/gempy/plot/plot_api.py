@@ -26,7 +26,7 @@
 # This is for sphenix to find the packages
 # sys.path.append( path.dirname( path.dirname( path.abspath(__file__) ) ) )
 
-from typing import Union
+from typing import Union,List, Any
 
 import matplotlib.pyplot as plt
 # from .vista import Vista
@@ -58,6 +58,7 @@ def plot_2d(model, n_axis=None, section_names: list = None,
             show_scalar: Union[bool, list] = False,
             show_boundaries: Union[bool, list] = True,
             show_topography: Union[bool, list] = False,figsize = None,
+            series_n: Union[int, List[int]] = 0,
             **kwargs):
     """"Plot 2-D sections of geomodel.
 
@@ -160,7 +161,7 @@ def plot_2d(model, n_axis=None, section_names: list = None,
             p.plot_lith(temp_ax, cell_number=cell_number[e2],
                         direction=direction[e2], **kwargs)
         if show_scalar[e + e2] is True:
-            p.plot_scalar_field(temp_ax, cell_number=cell_number[e2],
+            p.plot_scalar_field(temp_ax, cell_number=cell_number[e2],sn = series_n,
                                 direction=direction[e2], **kwargs)
         if show_boundaries[e + e2] is True:
             p.plot_contacts(temp_ax, cell_number=cell_number[e2],

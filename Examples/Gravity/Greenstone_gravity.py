@@ -60,11 +60,13 @@ xy_ravel = np.vstack(list(map(np.ravel, xyz))).T
 
 radius = [5000,5000,20200]
 # kernel_resolution = [25,25,25]
-receivers = Receivers(radius,extent,xy_ravel,grav_res = grav_res)
+receivers = Receivers(radius,extent,xy_ravel,kernel_resolution = kernel_resolution)
 
 # %%
 ## COMPUTE GRAVITY
-# Convolute Over All Regular Grid
+## Different gravity schemes are implemented. The kernel preparation is separated out to exclude it out of the computational graph.
+
+## Convolute Over All Regular Grid
 model.activate_regular_grid()
 gpinput = model.get_graph_input()
 model.create_tensorflow_graph(gpinput,gradient=True,compute_gravity=True)
@@ -82,18 +84,12 @@ grav = model.compute_gravity(tz,g = g,receivers = receivers,method = 'conv_all')
 # g_center_regulargrid = GravityPreprocessing(centerReg_kernel)
 # tz_center_regulargrid = tf.constant(g_center_regulargrid.set_tz_kernel(),model.tfdtype)
 # tz = tf.constant(tz_center_regulargrid,model.tfdtype)
-
 # grav = model.compute_gravity(tz,kernel = centerReg_kernel,receivers = receivers,method = 'kernel_reg')
 
 # %%
 import matplotlib.pyplot as plt
 grav_np = grav.numpy().reshape(grav_res,grav_res)
 
-
 # %%
 f,ax = gp.plot_grav(model,receivers,grav_np,diff =False,figsize = (14,5))
 plt.show()
-
-
-
-# %%
