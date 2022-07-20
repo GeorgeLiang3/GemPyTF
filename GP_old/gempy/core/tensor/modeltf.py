@@ -293,7 +293,9 @@ class ModelTF(DataMutation):
                           self.surfaces.df.iloc[:, self.surfaces._n_properties:].values.shape[1],
                           x_to_interp_shape), dtype=self.dtype))
         return weights_vector,scalar_fields_matrix,mask_matrix,block_matrix
-        
+    
+
+
     def get_graph_input(self):
         number_of_points_per_surface_T,npf = self.set_tensorflow_shared_structure_surfaces()
         len_series_i,len_series_o,len_series_w,n_surfaces_per_series,n_universal_eq_T = self.set_tensorflow_shared_loop()
@@ -301,6 +303,24 @@ class ModelTF(DataMutation):
         weights_vector,scalar_fields_matrix,mask_matrix,block_matrix = self.reset_flow_control_initial_results()
         is_fault = self.set_tensorflow_shared_is_fault()
         fault_relation  = self.set_tensorflow_shared_fault_relation()
+        
+        # convert to tensor
+        len_series_i = tf.convert_to_tensor(len_series_i,tf.int32)
+        len_series_o = tf.convert_to_tensor(len_series_o,tf.int32)
+        len_series_w = tf.convert_to_tensor(len_series_w,tf.int32)
+        n_surfaces_per_series = tf.convert_to_tensor(n_surfaces_per_series,tf.int32)
+        n_universal_eq_T = tf.convert_to_tensor(n_universal_eq_T,tf.int32)
+        # is_erosion = tf.convert_to_tensor(is_erosion,tf.bool)
+        is_erosion = is_erosion.tolist()
+        is_onlap = is_onlap.tolist()
+        is_fault = tf.convert_to_tensor(is_fault,tf.bool)
+        weights_vector = tf.convert_to_tensor(weights_vector,self.tfdtype)
+        fault_relation = tf.convert_to_tensor(fault_relation,tf.bool)
+        scalar_fields_matrix = tf.convert_to_tensor(scalar_fields_matrix,self.tfdtype)
+        mask_matrix = mask_matrix.tolist()
+        block_matrix = tf.convert_to_tensor(block_matrix,self.tfdtype)
+
+
         return [number_of_points_per_surface_T,
                 npf,
                 len_series_i,
@@ -317,21 +337,31 @@ class ModelTF(DataMutation):
                 mask_matrix,
                 block_matrix]
     
-    def create_tensorflow_graph(self, input, slope = 100000, gradient = False,compute_gravity = False):
+    def create_tensorflow_graph(self, input, slope = 100000, gradient = False,compute_gravity = False,matrix_size = None):
         self.TFG = TFGraph(input, self.fault_drift,
                 self.grid_tensor, self.values_properties, self.nugget_effect_grad,self.nugget_effect_scalar, self.Range,
-                self.C_o, self.rescale_factor,slope = slope, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity)
+                self.C_o, self.rescale_factor,slope = slope, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity,
+                matrix_size = matrix_size)
     
     # def calculate_grav(self,surface_coord, values_properties):
-        
     
-    def compute_model(self,surface_points = None,gradient = False):
+    def prepare_input(self,gradient = False,surface_points = None):
         self.activate_regular_grid()
         gpinput = self.get_graph_input()
-        self.create_tensorflow_graph(gpinput,gradient)
+        number_of_points_per_surface = gpinput[0]
         if surface_points is None:
-            surface_points = self.surface_points_coord
-        final_block,block_matrix,weights_vector,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
+            self.surface_points_ = self.surface_points_coord
+        else:
+            self.surface_points_ = surface_points
+        # get the concrete size of the matrix
+        self.matrix_size = self.grid_tensor.shape[0]+2*(tf.shape(self.surface_points_)[0] - \
+            tf.shape(number_of_points_per_surface)[0]).numpy()
+        self.create_tensorflow_graph(gpinput,gradient,matrix_size = self.matrix_size)
+        
+
+    def compute_model(self,surface_points = None,gradient = False):
+        self.prepare_input(gradient,surface_points)
+        final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(self.surface_points_,
                     self.dips_position,
                     self.dip_angles,
                     self.azimuth,
@@ -378,7 +408,7 @@ class ModelTF(DataMutation):
         if method == 'conv_all':
 
             size = tf.reduce_prod(self.geo_data.grid.regular_grid.resolution)
-            final_block,final_property,block_matrix,weights_vector,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
+            final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
                         self.dips_position,
                         self.dip_angles,
                         self.azimuth,
@@ -399,13 +429,12 @@ class ModelTF(DataMutation):
                 grav_convolution_full = grav_convolution_full.write(i, grav_)
             grav = tf.squeeze(grav_convolution_full.stack())
             
-            self.solutions.lith_block = final_block.numpy()
 
 
         if method == 'kernel_reg':
 
 
-            final_block,final_property,block_matrix,weights_vector,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
+            final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
                         self.dips_position,
                         self.dip_angles,
                         self.azimuth,
