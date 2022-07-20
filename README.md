@@ -31,3 +31,4 @@ current version has
 ### Known bugs to be fixed
 - <s>3D color map is in wrong order </s> (fixed)
 - <s>2D plot function `show_data` function not correct</s> (fixed)
+- Hessian in graph mode is limited
