@@ -7,7 +7,6 @@ import sys
 '''
 # from tensorflow.python.ops.gen_array_ops import ones_like
 
-
 class TFGraph(tf.Module):
 
     def __init__(self, input,
@@ -39,13 +38,13 @@ class TFGraph(tf.Module):
         # OPETIONS
         # -------
         self.gradient = kwargs.get('gradient', True)
-        self.max_speed = kwargs.get('max_speed', 1)
+        # self.max_speed = kwargs.get('max_speed', 1)
         self.gravity = kwargs.get('gravity', False)
 
         # CONSTANT PARAMETERS FOR ALL SERIES
         # KRIGING
         # -------
-        self.a_T = tf.cast(tf.divide(Range, rescalefactor), self.dtype)
+        self.a_T = tf.cast(tf.divide(Range, rescalefactor), self.dtype,name = 'cast_a_t')
         self.a_T_surface = self.a_T
         self.c_o_T = tf.divide(C_o, rescalefactor)
 
@@ -81,11 +80,11 @@ class TFGraph(tf.Module):
             self.sig_slope = tf.constant(slope, dtype=self.dtype) # default in Gempy 50
         else:
             self.sig_slope = tf.constant(
-                50000, dtype=self.dtype, name='Sigmoid slope')
+                50000, dtype=self.dtype, name='Sigmoid_slope')
             self.not_l = tf.constant(
-                50, dtype=self.dtype, name='Sigmoid Outside')
+                50, dtype=self.dtype, name='Sigmoid_Outside')
             self.ellipse_factor_exponent = tf.constant(
-                2, dtype=self.dtype, name='Attenuation factor')
+                2, dtype=self.dtype, name='Attenuation_factor')
 
         # self.dip_angles_all = dip_angles
         # self.azimuth_all = azimuth
@@ -95,7 +94,7 @@ class TFGraph(tf.Module):
         # self.azimuth = self.azimuth_all
         # self.polarity = self.polarity_all
 
-        self.number_of_series = 1
+        self.number_of_series = tf.constant(1,dtype = tf.int32,name = 'number_of_series')
 
         self.values_properties_op = values_properties
 
@@ -116,12 +115,12 @@ class TFGraph(tf.Module):
 
         if 'gravity' in self.compute_type:
             self.lg0 = tf.constant(0, dtype=tf.int32)
-            self.lg1 = tf.constant(1, dtype=tf.int32)
+            self.lg1 = tf.constant(1, dtype=tf.int32,name = 'lg1')
 
             self.tz =  tf.zeros((0,1),dtype=tf.int32)
-            self.pos_density = tf.constant(1, dtype=tf.int32)
+            self.pos_density = tf.constant(1, dtype=tf.int32,name = 'pos_density')
 
-        self.n_surface = range(1, 5000)
+        # self.n_surface = range(1, 5000)
         ##
         
         ### Some place holders for interpolator
@@ -136,7 +135,7 @@ class TFGraph(tf.Module):
     def set_rest_ref_matrix(self, number_of_points_per_surface, surface_points_all, nugget_effect_scalar):
         # reference point: every first point of each layer
         ref_positions = tf.cumsum(
-            tf.concat([[0], number_of_points_per_surface[:-1] + 1], axis=0))
+            tf.concat([[0], number_of_points_per_surface[:-1] + tf.constant(1, dtype=tf.int32,name = 'ref_positions_')], axis=0))
 
         partitions = tf.reduce_sum(tf.one_hot(ref_positions,tf.reduce_sum(number_of_points_per_surface+1),dtype = tf.int32),axis=0)
         # reference:1 rest: 0
@@ -256,7 +255,7 @@ class TFGraph(tf.Module):
                            tf.ones([tf.shape(dips_position)[0], tf.shape(dips_position)[0]])], axis=1)
 
         perpendicularity_matrix = tf.cast(
-            tf.concat([sub_x, sub_y, sub_z], axis=0), dtype=self.dtype)
+            tf.concat([sub_x, sub_y, sub_z], axis=0), dtype=self.dtype,name = 'cast_pm')
 
         condistion_fail = tf.math.divide_no_nan(h_u * h_v, sed_dips_dips ** 2) * (
             tf.where(sed_dips_dips < self.a_T,
@@ -555,16 +554,16 @@ class TFGraph(tf.Module):
 
         length_of_CG, length_of_CGI, length_of_U_I, length_of_faults, length_of_C = self.matrices_shapes()
 
-        _submatrix1 = tf.transpose(tf.concat([grid_val, grid_val**2], 1))
+        _submatrix1 = tf.transpose(tf.concat([grid_val, grid_val**2], 1),name = 'transpose_submatrix1')
 
         _submatrix2 = tf.stack([grid_val[:, 0] * grid_val[:, 1], grid_val[:, 0]
-                                * grid_val[:, 2], grid_val[:, 1] * grid_val[:, 2]])
+                                * grid_val[:, 2], grid_val[:, 1] * grid_val[:, 2]],name = 'stack_submatrix2')
 
         universal_grid_surface_points_matrix = tf.concat(
-            [_submatrix1, _submatrix2], 0)
+            [_submatrix1, _submatrix2], 0,name = 'concat_universal_grid_surface_points_matrix')
 
         i_rescale_aux = tf.concat([tf.ones([3], dtype=self.dtype), tf.tile(
-            tf.expand_dims(self.gi_rescale, 0), [6])], -1)
+            tf.expand_dims(self.gi_rescale, 0), [6],name = 'tile_i_rescale_aux')], -1, name = 'concat_i_rescale_aux')
 
         _aux_magic_term = tf.tile(tf.expand_dims(
             i_rescale_aux[:self.n_universal_eq_T_op], 0), [tf.shape(grid_val)[0], 1])
@@ -662,9 +661,9 @@ class TFGraph(tf.Module):
         Returns:
             Tensor: segmented values
         """
-        n_surface_0 = n_surface[:, slice_init:slice_init + 1]
-        n_surface_1 = n_surface[:, slice_init + 1:slice_init + 2]
-        drift = drift[:, slice_init:slice_init + 1]
+        n_surface_0 = n_surface[:, slice_init:slice_init + tf.constant(1,tf.int32,name = 'n_surface_0_')]
+        n_surface_1 = n_surface[:, slice_init + tf.constant(1,tf.int32,name = 'n_surface_1_'):slice_init + tf.constant(2,tf.int32,name = 'n_surface_1_')]
+        drift = drift[:, slice_init:slice_init + tf.constant(1,tf.int32,name = 'drift_')]
 
         # The 5 rules the slope of the function
         sigm = (-tf.reshape(n_surface_0, (-1, 1)) / (1 + tf.exp(-l * (Z_x - a))))  \
@@ -714,7 +713,7 @@ class TFGraph(tf.Module):
                 self.compare(scalar_field_iter[i], scalar_field_iter[i + 1],
                              2 * i, Z_x, slope, n_surface_op_float_sigmoid, drift)] # i ++
         _,formations_block = tf.while_loop(c, b, loop_vars=[i0, formations_block],
-                            shape_invariants=[i0.get_shape(), tf.TensorShape([None, self.matrix_size])])
+                            shape_invariants=[i0.get_shape(), tf.TensorShape([None, self.matrix_size])],name = 'while_compare')
         # for i in range(2):
         # ## tensorflow autograph trick, only with this loop set to concret shape, second order derivative can work properly in graph mode
             
@@ -735,8 +734,10 @@ class TFGraph(tf.Module):
         return formations_block
 
     #@tf.function
+    ### CHECK THIS
     def compute_forward_gravity(self, tz, lg0, lg1, densities=None):
-        densities = densities[lg0:lg1]
+        # densities = densities[lg0:lg1]
+        densities = tf.strided_slice(densities,[lg0],[lg1],[1],name = 'ss_densities')
         n_devices = tf.math.floordiv((tf.shape(densities)[0]), tf.shape(tz)[0])
         tz_rep = tf.tile(tz, [n_devices])
         grav = tf.reduce_sum(tf.reshape(densities * tz_rep, [n_devices, -1]), axis=1)
@@ -792,7 +793,8 @@ class TFGraph(tf.Module):
             data
         """    
         
-        self.dips_position = dips_position_all[len_f_0: len_f_1, :]
+        # self.dips_position = dips_position_all[len_f_0: len_f_1, :]
+        self.dips_position = tf.strided_slice(dips_position_all,[len_f_0,0],[len_f_1,tf.shape(dips_position_all)[1]],[1,1],name = 'ss')
         self.dips_position_tiled = tf.tile(
             self.dips_position, [self.n_dimensions, 1])
 
@@ -807,39 +809,47 @@ class TFGraph(tf.Module):
         self.a_T_scalar = range
         self.c_o_T_scalar = c_o
 
-        self.number_of_points_per_surface_T_op = self.number_of_points_per_surface_T[
-                                                 n_form_per_serie_0: n_form_per_serie_1]
 
-        self.npf_op = self.npf[n_form_per_serie_0: n_form_per_serie_1]
-        #n_surface_op = self.n_surface[n_form_per_serie_0: n_form_per_serie_1]
+        # self.number_of_points_per_surface_T_op = self.number_of_points_per_surface_T[
+        #                                          n_form_per_serie_0: n_form_per_serie_1]
+        # self.npf_op = self.npf[n_form_per_serie_0: n_form_per_serie_1]
+        # self.dip_angles = dip_angles_all[len_f_0: len_f_1]
+        # self.azimuth = azimuth_all[len_f_0: len_f_1]
+        # self.polarity = polarity_all[len_f_0: len_f_1]
+        # self.ref_layer_points = self.ref_layer_points_all[len_i_0: len_i_1, :]
+        # self.rest_layer_points = self.rest_layer_points_all[len_i_0: len_i_1, :]
+        # self.nugget_effect_scalar_T_op = self.nugget_effect_scalar_T_ref_rest[
+        #                                  len_i_0: len_i_1]
+        # self.nugget_effect_grad_T_op = self.nugget_effect_grad_T[
+        #                                len_f_0 * 3: len_f_1 * 3]
 
 
-        self.dip_angles = dip_angles_all[len_f_0: len_f_1]
 
-        self.azimuth = azimuth_all[len_f_0: len_f_1]
-        self.polarity = polarity_all[len_f_0: len_f_1]
+        self.number_of_points_per_surface_T_op = tf.strided_slice(self.number_of_points_per_surface_T,
+                                    [n_form_per_serie_0],[n_form_per_serie_1],[1],name='ss1')
+        self.npf_op = tf.strided_slice(self.npf,[n_form_per_serie_0],[n_form_per_serie_1],[1],name = 'ss2')
+        self.dip_angles = tf.strided_slice(dip_angles_all,[len_f_0],[len_f_1],[1],name = 'ss3')
+        self.azimuth = tf.strided_slice(azimuth_all,[len_f_0],[len_f_1],[1],name = 'ss4')
+        self.polarity = tf.strided_slice(polarity_all,[len_f_0],[len_f_1],[1],name = 'ss5')
+        self.ref_layer_points = tf.strided_slice(self.ref_layer_points_all,[len_i_0],[len_i_1],[1],name = 'ss6')
+        self.rest_layer_points = tf.strided_slice(self.rest_layer_points_all,[len_i_0],[len_i_1],[1],name = 'ss7')
+        self.nugget_effect_scalar_T_op = tf.strided_slice(self.nugget_effect_scalar_T_ref_rest,[len_i_0],[len_i_1],[1],name = 'ss8')
+        self.nugget_effect_grad_T_op = tf.strided_slice(self.nugget_effect_grad_T,[len_f_0 * 3],[len_f_1 * 3],[1],name = 'ss9')
+
+
         
-        ############################ CHANGE HERE ###########################
-        # self.ref_layer_points = self.ref_layer_points[len_i_0: len_i_1, :]
-        # self.rest_layer_points = self.rest_layer_points[len_i_0: len_i_1, :]
-        self.ref_layer_points = self.ref_layer_points_all[len_i_0: len_i_1, :]
-        self.rest_layer_points = self.rest_layer_points_all[len_i_0: len_i_1, :]
-
-        self.nugget_effect_scalar_T_op = self.nugget_effect_scalar_T_ref_rest[
-                                         len_i_0: len_i_1]
 
         # The gradients have been tiled outside
-        self.nugget_effect_grad_T_op = self.nugget_effect_grad_T[
-                                       len_f_0 * 3: len_f_1 * 3]
-
+        
 
         x_to_interpolate_shape = tf.shape(self.grid_val)[0] + 2 * self.len_points        
 
-        faults_relation_op = self.fault_relation[:, n_series]
+        # faults_relation_op = self.fault_relation[:, n_series]
+        faults_relation_op = tf.strided_slice(self.fault_relation,[0],[n_series],[1],name = 'ss10')
 
-        indices = tf.where(faults_relation_op) ## tensorflow find nonzero index, reproduce Theano.nonzero
+        indices = tf.cast(tf.where(faults_relation_op,name = 'where_indices'),dtype = tf.int32,name = 'ind_cast') ## tensorflow find nonzero index, reproduce Theano.nonzero
         # indices = tf.squeeze(indices)
-        fault_matrix_op = tf.gather(self.fault_matrix,indices) # select the dimension where fault relation is true
+        fault_matrix_op = tf.gather(self.fault_matrix,indices,name = 'gather_fm') # select the dimension where fault relation is true
         fault_matrix_op = tf.reshape(fault_matrix_op,[-1,x_to_interpolate_shape])* self.offset
         # fault_matrix_op = self.fault_matrix[
         #                   T.nonzero(tf.cast(faults_relation_op, tf.int8))[0],
@@ -848,19 +858,21 @@ class TFGraph(tf.Module):
         if tf.shape(fault_matrix_op)[0] is None:
           self.lengh_of_faults =  tf.constant(0, dtype=tf.int32)
         else:
-          self.lengh_of_faults = tf.cast(tf.shape(fault_matrix_op)[0], tf.int32)
+          self.lengh_of_faults = tf.cast(tf.shape(fault_matrix_op)[0], tf.int32,name = 'cast_len_fault')
 
         # Erosion version
         ## Hope this work in Hessian calcualtion
-        is_erosion_ = self.is_erosion[:n_series + 1]
+        # is_erosion_ = self.is_erosion[:n_series + 1]
         # args_is_erosion = tf.experimental.numpy.nonzero(tf.concat(([1],is_erosion_),axis= 0))
         # last_erode = tf.math.argmax(args_is_erosion[0])
 
         #
         interface_loc = tf.shape(self.grid_val)[0]
-        self.fault_drift_at_surface_points_rest = fault_matrix_op[
-                                                  :, interface_loc + len_i_0:
-                                                     interface_loc + len_i_1]
+        # self.fault_drift_at_surface_points_rest = fault_matrix_op[
+        #                                           :, interface_loc + len_i_0:
+        #                                              interface_loc + len_i_1]
+        self.fault_drift_at_surface_points_rest = tf.strided_slice(fault_matrix_op,[0,interface_loc + len_i_0],[tf.shape(fault_matrix_op)[0],interface_loc + len_i_1],[1,1],name = 'ss')
+
 
         self.fault_drift_at_surface_points_ref = fault_matrix_op[
                                                  :,
@@ -929,13 +941,13 @@ class TFGraph(tf.Module):
         #       This adds a counter  --- check series onlap-fault --- check the chain starts with onlap
         # nsle = (nsle + is_onlap_or_fault) * is_onlap_or_fault * \
         #        self.is_onlap[n_series - nsle]
-        nsle = None
+        # nsle = None
 
         # idx_e = tf.math.logical_or(self.is_fault,faults_relation_op)[:self.is_erosion.shape[0]]
 
         # if self.compute_gravity_flag == True and tf.shape(value_properties)[0]>1:
         return self.block_matrix,self.property_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, \
-              self.fault_matrix, nsle
+              self.fault_matrix
 
         # return self.block_matrix, weights, Z_x, sfai, self.mask_matrix, \
         #       fault_matrix, nsle
@@ -950,7 +962,6 @@ class TFGraph(tf.Module):
         # self.azimuth_all = azimuth
         # self.polarity_all = polarity
 
-        
         self.ref_layer_points_all, self.rest_layer_points_all, self.ref_nugget, self.rest_nugget = self.set_rest_ref_matrix(
             self.number_of_points_per_surface_T, surface_point_all, self.nugget_effect_scalar)
         
@@ -960,7 +971,7 @@ class TFGraph(tf.Module):
         self.len_points = tf.shape(surface_point_all)[0] - \
             tf.shape(self.number_of_points_per_surface_T)[0]
             
-        num_series = self.len_series_i.shape[0] - 1
+        num_series = self.len_series_i.shape[0] - tf.constant(1, dtype=tf.int32,name = 'num_series_')
         
         matrix_fix_dim = tf.shape(self.grid_val)[0]+2*self.len_points
         self.block_matrix = tf.zeros((0,matrix_fix_dim),dtype=self.dtype)
@@ -971,14 +982,33 @@ class TFGraph(tf.Module):
 
         self.fault_matrix = tf.zeros((0,matrix_fix_dim),dtype=self.dtype)
 
-        # self.block_matrix = tf.zeros([num_series,tf.shape(self.grid_val)[0]+2*self.len_points] )
-        # self.mask_matrix = tf.zeros([num_series,tf.shape(self.grid_val)[0]+2*self.len_points] )
-        for i in range(num_series):
-        #   if self.compute_gravity_flag == True and tf.shape(value_properties)[0]>1:
-            tf.autograph.experimental.set_loop_options(
-                    shape_invariants=[(self.block_matrix, tf.TensorShape([None, self.matrix_size]))])
-            self.block_matrix,self.property_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, self.fault_matrix, nsle= self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
-                                                                            len_i_0=self.len_series_i[i], len_i_1=self.len_series_i[i+1],
+
+        # for i in range(num_series):
+        #     tf.autograph.experimental.set_loop_options(
+        #             shape_invariants=[(self.block_matrix, tf.TensorShape([None, self.matrix_size]))])
+        #     self.block_matrix,self.property_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, self.fault_matrix, nsle= self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
+        #                                                                     len_i_0=self.len_series_i[i], len_i_1=self.len_series_i[i+1],
+        #             len_f_0=self.len_series_o[i], len_f_1=self.len_series_o[i+1],
+        #             len_w_0=self.len_series_w[i], len_w_1=self.len_series_w[i+1],
+        #             n_form_per_serie_0=self.n_surfaces_per_series[i], n_form_per_serie_1=self.n_surfaces_per_series[i+1],
+        #             u_grade_iter=3,
+        #             compute_weight_ctr=True,
+        #             compute_scalar_ctr=True,
+        #             compute_block_ctr=True,
+        #             is_finite=False, is_erosion=self.is_erosion[i],
+        #             is_onlap=False,
+        #             n_series=i,
+        #             range=10., c_o=10.,
+        #             block_matrix=None, weights_vector=None,
+        #             scalar_field_matrix=None, sfai=None, mask_matrix=None,
+        #             nsle=0, grid=None,
+        #             shift=None)
+
+        i0 = tf.constant(0, name = 'i0') # i = 0
+        c = lambda i,block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix: tf.less(i, num_series) # while i < 2
+        def loop_body(i,block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix):
+            block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix = self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
+                    len_i_0=tf.strided_slice(self.len_series_i,[i],[i+1],[1],name = 'len_i_0')[0], len_i_1=tf.strided_slice(self.len_series_i,[i+1],[i+2],[1],name = 'len_i_1')[0],
                     len_f_0=self.len_series_o[i], len_f_1=self.len_series_o[i+1],
                     len_w_0=self.len_series_w[i], len_w_1=self.len_series_w[i+1],
                     n_form_per_serie_0=self.n_surfaces_per_series[i], n_form_per_serie_1=self.n_surfaces_per_series[i+1],
@@ -992,31 +1022,41 @@ class TFGraph(tf.Module):
                     range=10., c_o=10.,
                     block_matrix=None, weights_vector=None,
                     scalar_field_matrix=None, sfai=None, mask_matrix=None,
-                #   mask_matrix_f=None, fault_matrix=None,
                     nsle=0, grid=None,
                     shift=None)
-        #   block_matrix,property_matrix,mask_matrix,Z_x= self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
-        #   else:
-        #     self.block_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, self.fault_matrix, nsle= self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
-        #                                                                   len_i_0=self.len_series_i[i], len_i_1=self.len_series_i[i+1],
-        #           len_f_0=self.len_series_o[i], len_f_1=self.len_series_o[i+1],
-        #           len_w_0=self.len_series_w[i], len_w_1=self.len_series_w[i+1],
-        #           n_form_per_serie_0=self.n_surfaces_per_series[i], n_form_per_serie_1=self.n_surfaces_per_series[i+1],
-        #           u_grade_iter=3,
-        #           compute_weight_ctr=True,
-        #           compute_scalar_ctr=True,
-        #           compute_block_ctr=True,
-        #           is_finite=False, is_erosion=self.is_erosion[i],
-        #           is_onlap=False,
-        #           n_series=i,
-        #           range=10., c_o=10.,
-        #           block_matrix=None, weights_vector=None,
-        #           scalar_field_matrix=None, sfai=None, mask_matrix=None,
-        #         #   mask_matrix_f=None, fault_matrix=None,
-        #           nsle=0, grid=None,
-        #           shift=None)
+            return [i+tf.constant(1, dtype=tf.int32,name = 'i_increment'), block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix]
+        # b = lambda i,block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix: [i+1, self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
+        #             len_i_0=self.len_series_i[i], len_i_1=self.len_series_i[i+1],
+        #             len_f_0=self.len_series_o[i], len_f_1=self.len_series_o[i+1],
+        #             len_w_0=self.len_series_w[i], len_w_1=self.len_series_w[i+1],
+        #             n_form_per_serie_0=self.n_surfaces_per_series[i], n_form_per_serie_1=self.n_surfaces_per_series[i+1],
+        #             u_grade_iter=3,
+        #             compute_weight_ctr=True,
+        #             compute_scalar_ctr=True,
+        #             compute_block_ctr=True,
+        #             is_finite=False, is_erosion=self.is_erosion[i],
+        #             is_onlap=False,
+        #             n_series=i,
+        #             range=10., c_o=10.,
+        #             block_matrix=None, weights_vector=None,
+        #             scalar_field_matrix=None, sfai=None, mask_matrix=None,
+        #             nsle=0, grid=None,
+        #             shift=None)]
+        _i,self.block_matrix,self.property_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, self.fault_matrix = \
+                            tf.while_loop(c, loop_body, loop_vars=[i0,  self.block_matrix,self.property_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, self.fault_matrix],
+                            shape_invariants=[i0.get_shape(),
+                            tf.TensorShape([None, self.matrix_size]), # self.block_matrix
+                            tf.TensorShape([None, self.matrix_size]), # self.property_matrix
+                            tf.TensorShape([None, self.matrix_size]), # self.scalar_matrix
+                            # tf.TensorShape([None, self.n_surfaces_per_series[-1]]), # self.sfai
+                            #####TypeError: Dimension value must be integer or None or have an __index__ method, got value '<tf.Tensor 'strided_slice_5:0' shape=() dtype=int32>' with type '<class 'tensorflow.python.framework.ops.Tensor'>'
+                            ##### Have to change the slice to constant
+                            tf.TensorShape([None, None]), # self.sfai
+                            tf.TensorShape([None, self.matrix_size]), # self.mask_matrix
+                            tf.TensorShape([None, self.matrix_size]), # self.fault_matrix
+                            ],name = 'while_compute_series')
         
-        # self.mask_matrix = mask_matrix
+
         
         # if the sigmoid flag is False, the mask matrix will be a boolean matrix
         # if the sigmoid flag is True, the mask matrix will be a interpolated mask matrix with sigmoid function
@@ -1030,26 +1070,19 @@ class TFGraph(tf.Module):
           else:
             final_property = self.property_matrix
         else:
-          last_series_mask = tf.math.cumprod(1-self.mask_matrix[:-1])
+          last_series_mask = tf.math.cumprod(tf.constant(1,dtype = self.dtype,name = 'last_series_mask_')-self.mask_matrix[:-1])
           block_mask = tf.concat([self.mask_matrix[-1:],last_series_mask],axis=0)
           block_mask = self.mask_matrix*block_mask
           final_block = tf.reduce_sum(block_mask*self.block_matrix,0)
           if self.compute_gravity_flag == True:
-            final_property= tf.reduce_sum(block_mask*self.property_matrix,0)
+            final_property= tf.reduce_sum(block_mask*self.property_matrix,0,name = 'reduce_sum_final_property')
           else:
             final_property = self.property_matrix
         
         # return final_block,final_property,block_mask
 
         # if self.compute_gravity_flag == True:
-        return [final_block,
-                final_property,
-                self.block_matrix,
-                # fault_block,
-                self.scalar_matrix,
-                self.sfai,
-                block_mask,
-                self.fault_matrix]
+        return final_block,final_property,self.block_matrix,self.scalar_matrix,self.sfai,block_mask,self.fault_matrix
 
         # return [final_block,
         #         self.block_matrix,
