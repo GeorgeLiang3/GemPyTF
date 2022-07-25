@@ -27,7 +27,7 @@ class ModelTF(DataMutation):
         dip_angles = tf.cast(dip_angles,self.tfdtype)
 
 
-        grid = tf.cast(grid,self.tfdtype,name = 'cast_grid')
+        grid = tf.cast(grid,self.tfdtype)
         self.dips_position = tf.cast(dips_position,self.tfdtype)
         azimuth = tf.cast(azimuth,self.tfdtype)
         polarity = tf.cast(polarity,self.tfdtype)
@@ -99,7 +99,6 @@ class ModelTF(DataMutation):
         # self.geo_data.grid.set_active(['sections'])
         self.geo_data.update_from_grid()
         self.grid = self.geo_data.grid
-        self.resolution_ = tf.constant(self.geo_data.grid.regular_grid.resolution,tf.int32,name = 'Const_resolution')
         self.from_gempy_interpolator()
 
     def activate_customized_grid(self,grid_kernel):
@@ -412,8 +411,8 @@ class ModelTF(DataMutation):
             surface_points = self.surface_points_coord
         if method == 'conv_all':
             # resolution_ = tf.constant(self.geo_data.grid.regular_grid.resolution,dtype = tf.int32)
-            size = tf.reduce_prod(self.resolution_,name = 'reduce_prod_size_')
-            # size = tf.reduce_prod(self.geo_data.grid.regular_grid.resolution,name = 'reduce_prod_size_')
+            # size = tf.reduce_prod(resolution_,name = 'reduce_prod_size_')
+            size = tf.reduce_prod(self.geo_data.grid.regular_grid.resolution,name = 'reduce_prod_size_')
 
             final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
                         self.dips_position,
@@ -423,7 +422,7 @@ class ModelTF(DataMutation):
                         self.values_properties)
 
             # densities = final_property[0:size] # slice the density by resolution
-            densities = tf.strided_slice(final_property,[0],[size],[1],name = 'ss_w_den_') # This fix the 'Const_4' int64_val : 1 when print the graph
+            densities = tf.strided_slice(final_property,[0],[size],[1],name = 'ss_w_den_')
             center_index_x = tf.constant((g.new_xy_ravel[0]-receivers.extent[0])//g.dx,self.tfdtype,name = 'center_index_x')
             center_index_y = tf.constant((g.new_xy_ravel[1]-receivers.extent[2])//g.dy,self.tfdtype,name = 'center_index_y')
             grav_convolution_full = tf.TensorArray(self.tfdtype, size=receivers.n_devices, dynamic_size=False, clear_after_read=True)
@@ -431,13 +430,9 @@ class ModelTF(DataMutation):
             i = tf.constant(0,name = 'i_')
             c_x = tf.cast(center_index_x[i],tf.int32,name = 'c_x')
             c_y = tf.cast(center_index_y[i],tf.int32,name = 'c_y')
-            
 
-            ## Calculate the gravity of each receiver
-            # windowed_densities = tf.reshape(densities,self.geo_data.grid.regular_grid.resolution)[c_x-g.radius_cell_x:c_x+g.radius_cell_x+tf.constant(1,name = 'windowed_densities_1'),c_y-g.radius_cell_y:c_y+g.radius_cell_y+tf.constant(1,name = 'windowed_densities_2'),:]
-            windowed_densities = tf.reshape(densities,self.resolution_)
-            windowed_densities = tf.strided_slice(windowed_densities,[c_x-g.radius_cell_x,c_y-g.radius_cell_y,0 ],[c_x+g.radius_cell_x+tf.constant(1,name = 'windowed_densities_1'),c_y+g.radius_cell_y+tf.constant(1,name = 'windowed_densities_2'),self.resolution_[2]],[1,1,1],name = 'ss_w_den_1')
-            windowed_densities = tf.squeeze(tf.reshape(windowed_densities,[-1,1]))
+            windowed_densities = tf.reshape(densities,self.geo_data.grid.regular_grid.resolution)[c_x-g.radius_cell_x:c_x+g.radius_cell_x+tf.constant(1,name = 'windowed_densities_1'),c_y-g.radius_cell_y:c_y+g.radius_cell_y+tf.constant(1,name = 'windowed_densities_2'),:]
+            windowed_densities = tf.squeeze(tf.reshape(windowed_densities,(-1,1)))
             grav_ = self.TFG.compute_forward_gravity(tz, 0, size, windowed_densities)
             grav_convolution_full = grav_convolution_full.write(i, grav_)
             grav = tf.squeeze(grav_convolution_full.stack())
