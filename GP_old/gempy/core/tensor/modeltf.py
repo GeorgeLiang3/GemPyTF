@@ -427,19 +427,19 @@ class ModelTF(DataMutation):
             center_index_x = tf.constant((g.new_xy_ravel[0]-receivers.extent[0])//g.dx,self.tfdtype,name = 'center_index_x')
             center_index_y = tf.constant((g.new_xy_ravel[1]-receivers.extent[2])//g.dy,self.tfdtype,name = 'center_index_y')
             grav_convolution_full = tf.TensorArray(self.tfdtype, size=receivers.n_devices, dynamic_size=False, clear_after_read=True)
-            # for i in tf.range(receivers.n_devices):
-            i = tf.constant(0,name = 'i_')
-            c_x = tf.cast(center_index_x[i],tf.int32,name = 'c_x')
-            c_y = tf.cast(center_index_y[i],tf.int32,name = 'c_y')
-            
+            for i in tf.range(receivers.n_devices):
+            # i = tf.constant(0,name = 'i_')
+                c_x = tf.cast(center_index_x[i],tf.int32,name = 'c_x')
+                c_y = tf.cast(center_index_y[i],tf.int32,name = 'c_y')
+                
 
-            ## Calculate the gravity of each receiver
-            # windowed_densities = tf.reshape(densities,self.geo_data.grid.regular_grid.resolution)[c_x-g.radius_cell_x:c_x+g.radius_cell_x+tf.constant(1,name = 'windowed_densities_1'),c_y-g.radius_cell_y:c_y+g.radius_cell_y+tf.constant(1,name = 'windowed_densities_2'),:]
-            windowed_densities = tf.reshape(densities,self.resolution_)
-            windowed_densities = tf.strided_slice(windowed_densities,[c_x-g.radius_cell_x,c_y-g.radius_cell_y,0 ],[c_x+g.radius_cell_x+tf.constant(1,name = 'windowed_densities_1'),c_y+g.radius_cell_y+tf.constant(1,name = 'windowed_densities_2'),self.resolution_[2]],[1,1,1],name = 'ss_w_den_1')
-            windowed_densities = tf.squeeze(tf.reshape(windowed_densities,[-1,1]))
-            grav_ = self.TFG.compute_forward_gravity(tz, 0, size, windowed_densities)
-            grav_convolution_full = grav_convolution_full.write(i, grav_)
+                ## Calculate the gravity of each receiver
+                # windowed_densities = tf.reshape(densities,self.geo_data.grid.regular_grid.resolution)[c_x-g.radius_cell_x:c_x+g.radius_cell_x+tf.constant(1,name = 'windowed_densities_1'),c_y-g.radius_cell_y:c_y+g.radius_cell_y+tf.constant(1,name = 'windowed_densities_2'),:]
+                windowed_densities = tf.reshape(densities,self.resolution_)
+                windowed_densities = tf.strided_slice(windowed_densities,[c_x-g.radius_cell_x,c_y-g.radius_cell_y,0 ],[c_x+g.radius_cell_x+tf.constant(1,name = 'windowed_densities_1'),c_y+g.radius_cell_y+tf.constant(1,name = 'windowed_densities_2'),self.resolution_[2]],[1,1,1],name = 'ss_w_den_1')
+                windowed_densities = tf.squeeze(tf.reshape(windowed_densities,[-1,1]))
+                grav_ = self.TFG.compute_forward_gravity(tz, 0, size, windowed_densities)
+                grav_convolution_full = grav_convolution_full.write(i, grav_)
             grav = tf.squeeze(grav_convolution_full.stack())
             
 
