@@ -993,7 +993,7 @@ class PlotSolution(PlotData2D):
             show_data = False   # to plot legend even when there are no data points in the section
         if not show_data and show_legend:
             patches = [mpatches.Patch(color=color, label=surface) for surface, color in self._color_lot.items()]
-            plt.legend(handles=patches, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+            plt.legend(handles=patches, bbox_to_anchor=(1.15, 1), loc=2, borderaxespad=0.)
 
         # TODO This only works fine for the y projection ?
         ax = plt.gca();
