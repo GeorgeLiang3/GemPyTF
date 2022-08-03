@@ -669,8 +669,6 @@ class TFGraph(tf.Module):
         sigm = (-tf.reshape(n_surface_0, (-1, 1)) / (1 + tf.exp(-l * (Z_x - a))))  \
             - (tf.reshape(n_surface_1, (-1, 1)) /
              (1 + tf.exp(l * (Z_x - b)))) + tf.reshape(drift, (-1, 1))
-        # print('a:',a)
-        # print('b:',b)
 
         sigm.set_shape([None, None])
         return sigm
@@ -733,7 +731,7 @@ class TFGraph(tf.Module):
             formations_block += ReLU_down + ReLU_up
         return formations_block
 
-    #@tf.function
+    # @tf.function
     ### CHECK THIS
     def compute_forward_gravity(self, tz, lg0, lg1, densities=None):
         # densities = densities[lg0:lg1]
@@ -758,7 +756,7 @@ class TFGraph(tf.Module):
         scalar_field_results = sigma_0_grad + sigma_0_interf + f_0 + f_1
         return scalar_field_results
               
-    # @tf.function
+    @tf.function
     def compute_a_series(self,surface_point_all,dips_position_all,dip_angles_all,azimuth_all,polarity_all,value_properties,
                          len_i_0=0, len_i_1=None,
                          len_f_0=0, len_f_1=None,
@@ -773,7 +771,7 @@ class TFGraph(tf.Module):
                          n_series=0,
                          range=10., c_o=10.,
                          block_matrix=None, weights_vector=None,
-                         scalar_field_matrix=None, sfai=None, mask_matrix=None,
+                         scalar_field_matrix=None, sfai_concat=None, mask_matrix=None,property_matrix = None,
                          mask_matrix_f=None, fault_matrix=None, nsle=0, grid=None,
                          shift=None
                          ):
@@ -844,12 +842,13 @@ class TFGraph(tf.Module):
 
         x_to_interpolate_shape = tf.shape(self.grid_val)[0] + 2 * self.len_points        
 
-        # faults_relation_op = self.fault_relation[:, n_series]
-        faults_relation_op = tf.strided_slice(self.fault_relation,[0],[n_series],[1],name = 'ss10')
+        faults_relation_op = self.fault_relation[:, n_series]
+        # faults_relation_op = tf.strided_slice(self.fault_relation,[0],[n_series],[1],name = 'ss10')
 
-        indices = tf.cast(tf.where(faults_relation_op,name = 'where_indices'),dtype = tf.int32,name = 'ind_cast') ## tensorflow find nonzero index, reproduce Theano.nonzero
+        indices = tf.where(faults_relation_op) ## tensorflow find nonzero index, reproduce Theano.nonzero
+        # indices = tf.cast(tf.where(faults_relation_op,name = 'where_indices'),dtype = tf.int32,name = 'ind_cast') ## tensorflow find nonzero index, reproduce Theano.nonzero
         # indices = tf.squeeze(indices)
-        fault_matrix_op = tf.gather(self.fault_matrix,indices,name = 'gather_fm') # select the dimension where fault relation is true
+        fault_matrix_op = tf.gather(fault_matrix,indices,name = 'gather_fm') # select the dimension where fault relation is true
         fault_matrix_op = tf.reshape(fault_matrix_op,[-1,x_to_interpolate_shape])* self.offset
         # fault_matrix_op = self.fault_matrix[
         #                   T.nonzero(tf.cast(faults_relation_op, tf.int8))[0],
@@ -918,20 +917,20 @@ class TFGraph(tf.Module):
         self.block = block
 
         ## In theano, this is done by set_subtensor, because tensor does not allow tensor assignment, here I use concat
-        self.block_matrix = tf.concat([self.block_matrix,tf.slice(block,[0,0],[1,-1])],axis=0)
-        self.fault_matrix = tf.concat([self.fault_matrix,tf.slice(block,[0,0],[1,-1])],axis=0)
+        block_matrix = tf.concat([block_matrix,tf.slice(block,[0,0],[1,-1])],axis=0)
+        fault_matrix = tf.concat([fault_matrix,tf.slice(block,[0,0],[1,-1])],axis=0)
         if self.compute_gravity_flag == True:
-            self.property_matrix = tf.concat([self.property_matrix,tf.slice(block,[1,0],[1,-1])],axis=0)
+            property_matrix = tf.concat([property_matrix,tf.slice(block,[1,0],[1,-1])],axis=0)
 
-        self.mask_matrix = tf.concat([self.mask_matrix,mask_e],axis=0)
+        mask_matrix = tf.concat([mask_matrix,mask_e],axis=0)
         
-        self.scalar_matrix = tf.concat([self.scalar_matrix,tf.expand_dims(Z_x,axis=0)],axis=0)
+        scalar_field_matrix = tf.concat([scalar_field_matrix,tf.expand_dims(Z_x,axis=0)],axis=0)
         
         paddings = tf.stack([[n_form_per_serie_0, self.n_surfaces_per_series[-1] - n_form_per_serie_1]],axis=0)
 
         sfai = tf.expand_dims(tf.pad(scalar_field_at_surface_points,paddings ),axis=0)
 
-        self.sfai = tf.concat([self.sfai,sfai],axis = 0)
+        sfai_concat = tf.concat([sfai_concat,sfai],axis = 0)
         
         # Number of series since last erode: This is necessary in case there are multiple consecutives onlaps
         # Onlap version
@@ -946,15 +945,15 @@ class TFGraph(tf.Module):
         # idx_e = tf.math.logical_or(self.is_fault,faults_relation_op)[:self.is_erosion.shape[0]]
 
         # if self.compute_gravity_flag == True and tf.shape(value_properties)[0]>1:
-        return self.block_matrix,self.property_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, \
-              self.fault_matrix
+        return block_matrix,property_matrix, scalar_field_matrix, sfai_concat, mask_matrix, \
+              fault_matrix
 
         # return self.block_matrix, weights, Z_x, sfai, self.mask_matrix, \
         #       fault_matrix, nsle
         # return self.block_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, \
         #       self.fault_matrix, nsle
 
-    # @tf.function
+    @tf.function
     def compute_series(self,surface_point_all,dips_position_all,dip_angles, azimuth, polarity,value_properties,):
         # self.surface_point_all = surface_point_all
         # self.dips_position_all = dips_position_all
@@ -1020,8 +1019,8 @@ class TFGraph(tf.Module):
                     is_onlap=False,
                     n_series=i,
                     range=10., c_o=10.,
-                    block_matrix=None, weights_vector=None,
-                    scalar_field_matrix=None, sfai=None, mask_matrix=None,
+                    block_matrix=block_matrix, weights_vector=None,
+                    scalar_field_matrix=scalar_matrix, sfai_concat=sfai, mask_matrix=mask_matrix,fault_matrix = fault_matrix,property_matrix=property_matrix,
                     nsle=0, grid=None,
                     shift=None)
             return [i+tf.constant(1, dtype=tf.int32,name = 'i_increment'), block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix]

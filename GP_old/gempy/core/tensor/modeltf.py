@@ -374,34 +374,32 @@ class ModelTF(DataMutation):
                     self.values_properties)
         
         self.grid = self._grid
-        if self._grid.active_grids[0] == True:
-            regular = self._grid.get_grid_args('regular')
-            self.solutions.lith_block = (final_block[regular[0]:regular[1]]).numpy()
-            # self.solutions.lith_block = np.round(formation_block[regular[0]:regular[1]])
-        # if self._grid.active_grids[-1] == True:
-        #     center = self._grid.get_grid_args('centered')
-        #     self.solutions.values_matrix =property_block[center[0]:center[1]]
+        size = tf.reduce_prod(self.resolution_,name = 'reduce_prod_size_')
+        sol = final_block,final_property,block_matrix,block_mask,size,Z_x,sfai
+        self.set_solutions(sol)
+
+        # if self._grid.active_grids[0] == True:
+        #     regular = self._grid.get_grid_args('regular')
+        #     self.solutions.lith_block = (final_block[regular[0]:regular[1]]).numpy()
+
         
+        # self.solutions.scalar_field_matrix = self.TFG.scalar_matrix[:,regular[0]:regular[1]].numpy()
+        # self.solutions.mask_matrix = block_mask[:,regular[0]:regular[1]].numpy()>0
+        # self.solutions.scalar_field_at_surface_points = self.TFG.sfai.numpy()
+        # self.solutions._grid = self._grid
+        # self.solutions.grid = self._grid
         
-        self.solutions.scalar_field_matrix = self.TFG.scalar_matrix[:,regular[0]:regular[1]].numpy()
-        self.solutions.mask_matrix = block_mask[:,regular[0]:regular[1]].numpy()>0
-        self.solutions.scalar_field_at_surface_points = self.TFG.sfai.numpy()
-        self.solutions._grid = self._grid
-        self.solutions.grid = self._grid
-        
-        l0, l1 = self.solutions.grid.get_grid_args('sections')
-        # print('formation_block',formation_block[l0: l1])
-        # print('scalar_matrix',self.TFG.scalar_matrix[:, l0: l1])
-        self.solutions.sections = np.array(
-            [final_block[l0: l1].numpy(), self.TFG.scalar_matrix[:, l0: l1].numpy().astype(float)])
+        # l0, l1 = self.solutions.grid.get_grid_args('sections')
+
+        # self.solutions.sections = np.array(
+        #     [final_block[l0: l1].numpy(), self.TFG.scalar_matrix[:, l0: l1].numpy().astype(float)])
         
         self.solutions.compute_all_surfaces()
 
         self.set_surface_order_from_solution()
 
     
-    def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,gradient = False,Hessian = False,method = None,window_resolution = None,test = False):
-
+    def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,gradient = False,Hessian = False,method = None,window_resolution = None,grav_only = False):
         implemented_methods_lst = ['conv_all','kernel_reg','kernel_geom','kernel_ml']
         if method in implemented_methods_lst: 
             pass   
@@ -457,23 +455,32 @@ class ModelTF(DataMutation):
             densities = final_property[:size]
 
             grav = self.TFG.compute_forward_gravity(tz, 0, size, densities)
-        if test == False:
-            return grav_convolution_full
+        if grav_only == True:
+            return grav
         else:
-            return final_block,final_property,block_matrix,block_mask,size,Z_x,grav
+            return final_block,final_property,block_matrix,block_mask,size,Z_x,sfai,grav
     
     def set_solutions(self,sol):
-        final_block,final_property,block_matrix,block_mask,size,Z_x,grav = sol
+        # final_block,final_property,block_matrix,block_mask,size,Z_x,sfai,grav = sol
+        ## unzip the solutions
+        final_block  = sol[0]
+        final_property = sol[1]
+        block_matrix = sol[2]
+        block_mask = sol[3]
+        size = sol[4]
+        Z_x = sol[5]
+        sfai = sol[6]
+
         self.grid = self._grid
         if self._grid.active_grids[0] == True:
             regular = self._grid.get_grid_args('regular')
-            self.solutions.lith_block = (final_block[regular[0]:regular[1]]).numpy()
+            self.solutions.lith_block = (sol[0][regular[0]:regular[1]]).numpy()
 
         
         self.solutions.values_matrix = final_property[:size].numpy()
-        self.solutions.scalar_field_matrix = self.TFG.scalar_matrix[:,regular[0]:regular[1]].numpy()
+        self.solutions.scalar_field_matrix = Z_x[:,regular[0]:regular[1]].numpy()
         self.solutions.mask_matrix = block_mask[:,regular[0]:regular[1]].numpy()>0
-        self.solutions.scalar_field_at_surface_points = self.TFG.sfai.numpy()
+        self.solutions.scalar_field_at_surface_points = sfai.numpy()
         self.solutions._grid = self._grid
         self.solutions.grid = self._grid
         self.solutions.block_matrix = block_matrix[:,regular[0]:regular[1]].numpy()
@@ -482,7 +489,7 @@ class ModelTF(DataMutation):
         # print('formation_block',formation_block[l0: l1])
         # print('scalar_matrix',self.TFG.scalar_matrix[:, l0: l1])
         self.solutions.sections = np.array(
-            [final_block[l0: l1].numpy(), self.TFG.scalar_matrix[:, l0: l1].numpy().astype(float)])
+            [final_block[l0: l1].numpy(), Z_x[:, l0: l1].numpy().astype(float)])
         
         self.solutions.compute_all_surfaces()
 
