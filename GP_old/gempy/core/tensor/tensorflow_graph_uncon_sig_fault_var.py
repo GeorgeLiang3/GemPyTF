@@ -38,8 +38,10 @@ class TFGraph(tf.Module):
         # OPETIONS
         # -------
         self.gradient = kwargs.get('gradient', True)
-        # self.max_speed = kwargs.get('max_speed', 1)
         self.gravity = kwargs.get('gravity', False)
+        if kwargs.get('min_slope'):
+            self.min_slope = tf.constant(kwargs.get('min_slope'),self.dtype)
+        else: self.min_slope = 0
 
         # CONSTANT PARAMETERS FOR ALL SERIES
         # KRIGING
@@ -77,15 +79,21 @@ class TFGraph(tf.Module):
         # VARIABLES DEFINITION
         # ---------
         if self.gradient:
-            # self.sig_slope = tf.constant(slope, dtype=self.dtype) # default in Gempy 50
-            self.sig_slope = tf.Variable(slope,dtype = self.dtype,name = 'sigmoid_slope') # default in Gempy 50
+
+            self.delta_slope = tf.Variable(slope,dtype = self.dtype,name = 'delta_slope')
+            
+
+            # self.sig_slope = tf.Variable(slope,dtype = self.dtype,name = 'sigmoid_slope') # default in Gempy 50
         else:
-            self.sig_slope = tf.constant(
-                50000, dtype=self.dtype, name='Sigmoid_slope')
-            self.not_l = tf.constant(
-                50, dtype=self.dtype, name='Sigmoid_Outside')
-            self.ellipse_factor_exponent = tf.constant(
-                2, dtype=self.dtype, name='Attenuation_factor')
+            tf.print('slope:',slope)
+            self.delta_slope = tf.constant(slope,dtype = self.dtype,name = 'delta_slope')
+            tf.print(self.delta_slope)
+            # self.sig_slope = tf.constant(
+            #     50000, dtype=self.dtype, name='Sigmoid_slope')
+            # self.not_l = tf.constant(
+            #     50, dtype=self.dtype, name='Sigmoid_Outside')
+            # self.ellipse_factor_exponent = tf.constant(
+            #     2, dtype=self.dtype, name='Attenuation_factor')
 
         # self.dip_angles_all = dip_angles
         # self.azimuth_all = azimuth
@@ -97,7 +105,13 @@ class TFGraph(tf.Module):
 
         self.number_of_series = tf.constant(1,dtype = tf.int32,name = 'number_of_series')
 
-        self.values_properties_op = values_properties
+        # self.values_properties_op = values_properties
+        if values_properties.shape[0] > 1:
+            self.densities = tf.Variable(values_properties[1],dtype=self.dtype,name = 'densities')
+            self.lith_label = tf.constant(values_properties[0],dtype=self.dtype,name = 'lith_label')
+            self.value_properties = tf.stack([self.lith_label,self.densities],axis = 0)
+        else: 
+            self.value_properties = tf.constant(values_properties,dtype=self.dtype)
 
         self.grid_val = grid
 
@@ -131,6 +145,9 @@ class TFGraph(tf.Module):
         # self.is_onlap =tf.constant([0,1])
         # self.n_surfaces_per_series = tf.constant([3,3])
         # self.n_universal_eq_T = tf.constant([3,3])
+    
+    def update_property(self):
+        self.value_properties = tf.stack([self.lith_label,self.densities],axis = 0)
 
     #@tf.function
     def set_rest_ref_matrix(self, number_of_points_per_surface, surface_points_all, nugget_effect_scalar):
@@ -952,13 +969,14 @@ class TFGraph(tf.Module):
         # return self.block_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, \
         #       self.fault_matrix, nsle
 
-    @tf.function
-    def compute_series(self,surface_point_all,dips_position_all,dip_angles, azimuth, polarity,value_properties,):
-        # self.surface_point_all = surface_point_all
-        # self.dips_position_all = dips_position_all
-        # self.dip_angles_all = dip_angles
-        # self.azimuth_all = azimuth
-        # self.polarity_all = polarity
+    # @tf.function
+    def compute_series(self,surface_point_all,dips_position_all,dip_angles, azimuth, polarity):
+        
+        self.update_property()
+        if self.gradient:
+            self.sig_slope = self.min_slope - tf.abs(self.delta_slope) # default in Gempy 50
+        else:
+            self.sig_slope = self.delta_slope
 
         self.ref_layer_points_all, self.rest_layer_points_all, self.ref_nugget, self.rest_nugget = self.set_rest_ref_matrix(
             self.number_of_points_per_surface_T, surface_point_all, self.nugget_effect_scalar)
@@ -1005,7 +1023,7 @@ class TFGraph(tf.Module):
         i0 = tf.constant(0, name = 'i0') # i = 0
         c = lambda i,block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix: tf.less(i, num_series) # while i < 2
         def loop_body(i,block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix):
-            block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix = self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
+            block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix = self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,self.value_properties,
                     len_i_0=tf.strided_slice(self.len_series_i,[i],[i+1],[1],name = 'len_i_0')[0], len_i_1=tf.strided_slice(self.len_series_i,[i+1],[i+2],[1],name = 'len_i_1')[0],
                     len_f_0=self.len_series_o[i], len_f_1=self.len_series_o[i+1],
                     len_w_0=self.len_series_w[i], len_w_1=self.len_series_w[i+1],

@@ -473,8 +473,8 @@ class CenteredRegGrid(CenteredGrid):
     linear spaced centered grid.
     """
 
-    @staticmethod
-    def create_irregular_grid_kernel(resolution, radius):
+    # @staticmethod
+    def create_irregular_grid_kernel(self,resolution, radius):
         """
         Create an isometric grid kernel (centered at 0)
 
@@ -501,7 +501,7 @@ class CenteredRegGrid(CenteredGrid):
         dx = radius[0] * 2 / res_[0]
         dy = radius[1] * 2 / res_[1]
         dz = radius[2] / res_[2]
-        dxyz = [dx, dy, dz]
+        self.dxyz = [dx, dy, dz]
         for xyz in [0, 1, 2]:
             if xyz == 2:  # --> z
                 # Make the grid only negative for the z axis
@@ -515,7 +515,7 @@ class CenteredRegGrid(CenteredGrid):
                 )
                 g_2.append(
                     np.concatenate((-g_[xyz][::-1], g_[xyz][1:]))
-                    * (radius[xyz] - dxyz[xyz] / 2)
+                    * (radius[xyz] - self.dxyz[xyz] / 2)
                 )
                 d_.append(np.diff(np.pad(g_2[xyz], 1, "reflect", reflect_type="odd")))
 
