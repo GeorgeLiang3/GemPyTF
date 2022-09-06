@@ -26,7 +26,7 @@ geo_data.modify_order_surfaces(2,0)
 # %%
 ## modify one surface point
 
-geo_data.surface_points.modify_surface_points(21,Z = 600,surface = 'rock2')
+# geo_data.surface_points.modify_surface_points(21,Z = 600,surface = 'rock2')
 # %%
 ## I will integrate the module into GemPy through Interpolator later
 model = ModelTF(geo_data)

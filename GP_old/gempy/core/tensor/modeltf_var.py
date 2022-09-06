@@ -10,6 +10,9 @@ from gempy.core.grid_modules.grid_types import CenteredRegGrid
 class ModelTF(DataMutation):
     def __init__(self,geo_data) -> None:
         super().__init__()
+        # geo_data.surfaces.df.sort_values(by=['order_surfaces'], inplace=True, ascending=False)
+        # geo_data.surfaces.update_id()
+
         self.geo_data = geo_data
         self.tfdtype = tf.float64
         self.dtype = 'float64'
@@ -355,7 +358,7 @@ class ModelTF(DataMutation):
         '''
         self.TFG = TFGraph(input, self.fault_drift,
                 self.grid_tensor, self.values_properties, self.nugget_effect_grad,self.nugget_effect_scalar, self.Range,
-                self.C_o, self.rescale_factor,slope = slope, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity,
+                self.C_o, self.rescale_factor,delta_slope = slope, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity,
                 matrix_size = matrix_size,min_slope = min_slope)
     
     # def calculate_grav(self,surface_coord, values_properties):
@@ -403,11 +406,11 @@ class ModelTF(DataMutation):
         # self.solutions.sections = np.array(
         #     [final_block[l0: l1].numpy(), self.TFG.scalar_matrix[:, l0: l1].numpy().astype(float)])
         
-        self.solutions.compute_all_surfaces()
+        # self.solutions.compute_all_surfaces()
 
-        self.set_surface_order_from_solution()
+        # self.set_surface_order_from_solution()
 
-    
+    @tf.function
     def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,gradient = False,Hessian = False,method = None,window_resolution = None,grav_only = False):
         implemented_methods_lst = ['conv_all','kernel_reg','kernel_geom','kernel_ml']
         if method in implemented_methods_lst: 
@@ -499,5 +502,29 @@ class ModelTF(DataMutation):
             [final_block[l0: l1].numpy(), Z_x[:, l0: l1].numpy().astype(float)])
         
         self.solutions.compute_all_surfaces()
-
         self.set_surface_order_from_solution()
+
+
+    def set_surface_order_from_solution(self):
+        """
+        Order the surfaces respect the last computation. Therefore if you call this method,
+        after sorting surface_points without recomputing you may get wrong results.
+
+        Returns:
+            Surfaces
+        """
+        sfai_order = self.solutions.scalar_field_at_surface_points.sum(axis=0)
+        sel = self.surfaces.df['isActive'] & ~self.surfaces.df['isBasement']
+        self.surfaces.df.loc[sel, 'sfai'] = sfai_order
+        self.surfaces.df.sort_values(by=['series', 'sfai'], inplace=True, ascending=False)
+        self.surfaces.reset_order_surfaces()
+        self.surfaces.sort_surfaces()
+        self.surfaces.set_basement()
+        self.surface_points.df['id'] = self.surface_points.df['surface'].map(
+            self.surfaces.df.set_index('surface')['id']).astype(int)
+        self.orientations.df['id'] = self.orientations.df['surface'].map(
+            self.surfaces.df.set_index('surface')['id']).astype(int)
+        self.surface_points.sort_table()
+        self.orientations.sort_table()
+        self.update_structure()
+        return self.surfaces
