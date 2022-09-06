@@ -59,8 +59,8 @@ xyz = np.meshgrid(X_r, Y_r, Z_r)
 xy_ravel = np.vstack(list(map(np.ravel, xyz))).T
 
 radius = [5000,5000,20200]
-# kernel_resolution = [25,25,25]
-receivers = Receivers(radius,extent,xy_ravel,kernel_resolution = kernel_resolution)
+kernel_resolution = [25,25,25]
+receivers = Receivers(radius,extent,xy_ravel,kernel_resolution = kernel_resolution,grav_res = grav_res)
 
 # %%
 ## COMPUTE GRAVITY
@@ -73,7 +73,8 @@ model.create_tensorflow_graph(gpinput,gradient=True,compute_gravity=True)
 g = GravityPreprocessingRegAllLoop(receivers,model.geo_data.grid.regular_grid)
 tz = g.set_tz_kernel()
 tz = tf.constant(tz,model.tfdtype)
-grav = model.compute_gravity(tz,g = g,receivers = receivers,method = 'conv_all')
+print(tz)
+grav = model.compute_gravity(tz,g = g,receivers = receivers,method = 'conv_all',grav_only = True)
 
 ## Kernel Regular Grid
 # from gempy.core.grid_modules.grid_types import CenteredRegGrid
