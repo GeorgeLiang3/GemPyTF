@@ -451,6 +451,7 @@ class GemPyToVista(WidgetsCallbacks, RenderChanges):
             **kwargs:
         """
         cmap = mcolors.ListedColormap(list(self._get_color_lot(is_faults=True, is_basement=True)))
+        # print('surface color',list(self._get_color_lot(is_faults=True, is_basement=True)))
         
         if clear is True and self.plotter_type !='notebook':
             try:
@@ -730,7 +731,8 @@ class GemPyToVista(WidgetsCallbacks, RenderChanges):
                 cmap = mcolors.ListedColormap(hex_colors)
             if scalar_field == 'scalar' or scalar_field == 'all' or 'sf_' in scalar_field:
                 scalar_field_ = 'sf_'
-                for e, series in enumerate(self.model._stack.df.groupby('isActive').groups[True]):
+                # for e, series in enumerate(self.model._stack.df.groupby('isActive').groups[True]): # new way
+                for e, series in enumerate(self.model.series.df.groupby('isActive').groups[True]): # old way
                     regular_grid[scalar_field_ + series] = data.scalar_field_matrix[e]
 
             if (scalar_field == 'values' or scalar_field == 'all' or 'values_' in scalar_field) and\

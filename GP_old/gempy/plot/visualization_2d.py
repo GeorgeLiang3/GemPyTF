@@ -963,6 +963,8 @@ class PlotSolution(PlotData2D):
         imshow_kwargs = kwargs.copy()
         if 'show_grid' in imshow_kwargs:
             imshow_kwargs.pop('show_grid')
+        if 'title' in imshow_kwargs:
+            imshow_kwargs.pop('title')
         if 'grid_linewidth' in imshow_kwargs:
             imshow_kwargs.pop('grid_linewidth')
         if 'colorbar' in imshow_kwargs:
@@ -995,25 +997,35 @@ class PlotSolution(PlotData2D):
             patches = [mpatches.Patch(color=color, label=surface) for surface, color in self._color_lot.items()]
             plt.legend(handles=patches, bbox_to_anchor=(1.15, 1), loc=2, borderaxespad=0.)
 
-        # TODO This only works fine for the y projection ?
-        ax = plt.gca();
-        ax.set_xticks(np.linspace(extent_val[0], extent_val[1], sliced_block.shape[1]+1));
-        ax.set_yticks(np.linspace(extent_val[2], extent_val[3], sliced_block.shape[0]+1));
+        number_grid_x = sliced_block.shape[1]+1
+        number_grid_y = sliced_block.shape[0]+1
 
+        ax = plt.gca();
+        ax.set_xticks(np.linspace(extent_val[0], extent_val[1], number_grid_x));
+        ax.set_yticks(np.linspace(extent_val[2], extent_val[3], number_grid_y));
+
+        if 'title' in kwargs:
+            ax.set_title(kwargs['title'])
+        
         if show_boundaries:                                       
-            self.plot_contacts( cell_number = cell_number,direction='y')
+            self.plot_contacts( cell_number = cell_number,direction=direction)
 
         if 'show_grid' in kwargs:
             if kwargs['show_grid']:
                 grid_linewidth = kwargs.get('grid_linewidth', 1.5)
                 ax.grid(color='w', linestyle='-', linewidth=grid_linewidth)
 
-                
-            # hack to turn off the tick labels to prevent too dense values
-            n = 5  # Keeps every 5th label
+            
+        # hack to turn off the tick labels to prevent too dense values
+        
+        # only keep n ticks
+        n = 6
+        n_x = int(number_grid_x //n)
+        n_y = int(number_grid_y //n)
+        # n = 5  # Keeps every 5th label
 
-            [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n != 0 or l._x % 100 != 0]
-            [l.set_visible(False) for (i,l) in enumerate(ax.yaxis.get_ticklabels()) if i % n != 0]
+        [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n_x != 0 or l._x % 100 != 0]
+        [l.set_visible(False) for (i,l) in enumerate(ax.yaxis.get_ticklabels()) if i % n_y != 0]
         plt.xlabel(x)
         plt.ylabel(y)
         if 'colorbar' in kwargs:
@@ -1023,6 +1035,8 @@ class PlotSolution(PlotData2D):
                 cax = divider.append_axes("right", size="5%", pad=0.05)
                 plt.colorbar(im, cax=cax)
                 # plt.colorbar(im)
+
+        plt.show()
         return plt.gcf()
 
     def plot_scalar_field(self, solution, cell_number, series=0,series_name = None, N=20, block=None,

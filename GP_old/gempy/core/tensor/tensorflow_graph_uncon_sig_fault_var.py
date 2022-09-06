@@ -11,7 +11,7 @@ class TFGraph(tf.Module):
 
     def __init__(self, input,
                  fault_drift, grid, values_properties,nugget_effect_grad,nugget_effect_scalar,
-                Range, C_o, rescalefactor,slope=50, output=None,sigmoid=False,compute_gravity = False,matrix_size = None, **kwargs):
+                Range, C_o, rescalefactor,delta_slope=50, output=None,sigmoid=False,compute_gravity = False,matrix_size = None, **kwargs):
         super(TFGraph, self).__init__()
         
         (self.number_of_points_per_surface_T,
@@ -80,14 +80,14 @@ class TFGraph(tf.Module):
         # ---------
         if self.gradient:
 
-            self.delta_slope = tf.Variable(slope,dtype = self.dtype,name = 'delta_slope')
+            self.delta_slope = tf.Variable(delta_slope,dtype = self.dtype,name = 'delta_slope')
             
 
             # self.sig_slope = tf.Variable(slope,dtype = self.dtype,name = 'sigmoid_slope') # default in Gempy 50
         else:
-            tf.print('slope:',slope)
-            self.delta_slope = tf.constant(slope,dtype = self.dtype,name = 'delta_slope')
-            tf.print(self.delta_slope)
+ 
+            self.delta_slope = tf.constant(delta_slope,dtype = self.dtype,name = 'delta_slope')
+
             # self.sig_slope = tf.constant(
             #     50000, dtype=self.dtype, name='Sigmoid_slope')
             # self.not_l = tf.constant(
@@ -147,7 +147,8 @@ class TFGraph(tf.Module):
         # self.n_universal_eq_T = tf.constant([3,3])
     
     def update_property(self):
-        self.value_properties = tf.stack([self.lith_label,self.densities],axis = 0)
+        if self.value_properties.shape[0] > 1:
+            self.value_properties = tf.stack([self.lith_label,self.densities],axis = 0)
 
     #@tf.function
     def set_rest_ref_matrix(self, number_of_points_per_surface, surface_points_all, nugget_effect_scalar):
@@ -684,6 +685,7 @@ class TFGraph(tf.Module):
         drift = drift[:, slice_init:slice_init + tf.constant(1,tf.int32,name = 'drift_')]
 
         # The 5 rules the slope of the function
+        # print('l:',l)
         sigm = (-tf.reshape(n_surface_0, (-1, 1)) / (1 + tf.exp(-l * (Z_x - a))))  \
             - (tf.reshape(n_surface_1, (-1, 1)) /
              (1 + tf.exp(l * (Z_x - b)))) + tf.reshape(drift, (-1, 1))
@@ -725,11 +727,15 @@ class TFGraph(tf.Module):
 
         i0 = tf.constant(0) # i = 0
         c = lambda i,formations_block: tf.less(i, tf.shape(scalar_field_iter)[0]-1) # while i < 2
+        # print('n_surface_op_float_sigmoid: ',n_surface_op_float_sigmoid)
         b = lambda i,formations_block: [i+1, formations_block + \
                 self.compare(scalar_field_iter[i], scalar_field_iter[i + 1],
                              2 * i, Z_x, slope, n_surface_op_float_sigmoid, drift)] # i ++
         _,formations_block = tf.while_loop(c, b, loop_vars=[i0, formations_block],
                             shape_invariants=[i0.get_shape(), tf.TensorShape([None, self.matrix_size])],name = 'while_compare')
+
+        print(formations_block[0][:50])
+        print(formations_block[1][:50])
         # for i in range(2):
         # ## tensorflow autograph trick, only with this loop set to concret shape, second order derivative can work properly in graph mode
             
@@ -774,7 +780,7 @@ class TFGraph(tf.Module):
         scalar_field_results = sigma_0_grad + sigma_0_interf + f_0 + f_1
         return scalar_field_results
               
-    @tf.function
+    # @tf.function
     def compute_a_series(self,surface_point_all,dips_position_all,dip_angles_all,azimuth_all,polarity_all,value_properties,
                          len_i_0=0, len_i_1=None,
                          len_f_0=0, len_f_1=None,
