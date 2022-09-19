@@ -78,6 +78,12 @@ class RegularGrid:
         )
 
         values = np.vstack(tuple(map(np.ravel, g))).T.astype("float64")
+        
+        ### 
+        values = values.reshape(resolution+[3]) 
+        values = np.flip(values, 2)
+        values = values.reshape([-1,3])
+
         return values
 
     def get_dx_dy_dz(self, rescale=False):

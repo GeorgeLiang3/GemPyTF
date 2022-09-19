@@ -1019,7 +1019,7 @@ class PlotSolution(PlotData2D):
         # hack to turn off the tick labels to prevent too dense values
         
         # only keep n ticks
-        n = 6
+        n = 5
         n_x = int(number_grid_x //n)
         n_y = int(number_grid_y //n)
         # n = 5  # Keeps every 5th label
@@ -1032,11 +1032,11 @@ class PlotSolution(PlotData2D):
             if kwargs['colorbar'] is True: 
                 ax = plt.gca()
                 divider = make_axes_locatable(ax)
-                cax = divider.append_axes("right", size="5%", pad=0.05)
+                cax = divider.append_axes("right", size="5%", pad=0.4)
                 plt.colorbar(im, cax=cax)
                 # plt.colorbar(im)
 
-        plt.show()
+        # plt.show()
         return plt.gcf()
 
     def plot_scalar_field(self, solution, cell_number, series=0,series_name = None, N=20, block=None,

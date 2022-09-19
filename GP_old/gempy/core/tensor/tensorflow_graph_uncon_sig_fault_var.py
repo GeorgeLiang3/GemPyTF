@@ -480,6 +480,10 @@ class TFGraph(tf.Module):
         G = tf.concat([G_x, G_y, G_z], -1)
 
         G = tf.expand_dims(G, axis=1)
+
+        # TODO: George, I got this warning, need to check performance here
+        ## Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.[final_block[l0: l1].numpy(), Z_x[:, l0: l1].numpy().astype(float)])
+
         b_vector = tf.pad(G, [[0, length_of_C - tf.shape(G)[0]], [0, 0]])
 
         return b_vector
@@ -734,8 +738,8 @@ class TFGraph(tf.Module):
         _,formations_block = tf.while_loop(c, b, loop_vars=[i0, formations_block],
                             shape_invariants=[i0.get_shape(), tf.TensorShape([None, self.matrix_size])],name = 'while_compare')
 
-        print(formations_block[0][:50])
-        print(formations_block[1][:50])
+        # print(formations_block[0][:50])
+        # print(formations_block[1][:50])
         # for i in range(2):
         # ## tensorflow autograph trick, only with this loop set to concret shape, second order derivative can work properly in graph mode
             
@@ -780,7 +784,7 @@ class TFGraph(tf.Module):
         scalar_field_results = sigma_0_grad + sigma_0_interf + f_0 + f_1
         return scalar_field_results
               
-    # @tf.function
+    @tf.function
     def compute_a_series(self,surface_point_all,dips_position_all,dip_angles_all,azimuth_all,polarity_all,value_properties,
                          len_i_0=0, len_i_1=None,
                          len_f_0=0, len_f_1=None,
@@ -975,7 +979,7 @@ class TFGraph(tf.Module):
         # return self.block_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, \
         #       self.fault_matrix, nsle
 
-    # @tf.function
+    @tf.function
     def compute_series(self,surface_point_all,dips_position_all,dip_angles, azimuth, polarity):
         
         self.update_property()

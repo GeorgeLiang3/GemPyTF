@@ -6,6 +6,7 @@ from gempy.core.solution import Solution
 from gempy.core.model import DataMutation
 from gempy.assets.geophysics import *
 from gempy.core.grid_modules.grid_types import CenteredRegGrid
+import copy
 
 class ModelTF(DataMutation):
     def __init__(self,geo_data) -> None:
@@ -22,11 +23,11 @@ class ModelTF(DataMutation):
         self.additional_data = self.geo_data.additional_data
         self.faults = self.geo_data.faults
         self.series = self.geo_data.series
-        self._grid = self.geo_data.grid # grid object
+        self._grid = copy.deepcopy(self.geo_data.grid) # grid object
         # extract data from gempy interpolator
         dips_position, dip_angles, azimuth, polarity, surface_points_coord, fault_drift, grid, values_properties = self.interpolator.get_python_input_block()[0:-3]
 
-
+        self.resolution = self.geo_data.grid.regular_grid.resolution
         dip_angles = tf.cast(dip_angles,self.tfdtype)
 
 
@@ -110,6 +111,11 @@ class ModelTF(DataMutation):
         self.grid = self.geo_data.grid
         self.resolution_ = tf.constant(self.geo_data.grid.regular_grid.resolution,tf.int32,name = 'Const_resolution')
         self.from_gempy_interpolator()
+
+        # rotate the grid along z axis, to keep consistency with kernel grid
+        self.grid_tensor = tf.constant(self.revert_coordinates_alongz(self.grid_tensor.numpy()),dtype = self.tfdtype)
+
+        
 
     def activate_customized_grid(self,grid_kernel):
         self.geo_data.grid.custom_grid=grid_kernel
@@ -364,9 +370,14 @@ class ModelTF(DataMutation):
     # def calculate_grav(self,surface_coord, values_properties):
     
     def prepare_input(self,gradient = False,surface_points = None):
-        self.activate_regular_grid()
+        # self.activate_regular_grid()
+
         gpinput = self.get_graph_input()
         number_of_points_per_surface = gpinput[0]
+
+        # self.surface_points.sort_table()
+        # self.orientations.sort_table()
+
         if surface_points is None:
             self.surface_points_ = self.surface_points_coord
         else:
@@ -374,7 +385,7 @@ class ModelTF(DataMutation):
         # get the concrete size of the matrix
         self.matrix_size = self.grid_tensor.shape[0]+2*(tf.shape(self.surface_points_)[0] - \
             tf.shape(number_of_points_per_surface)[0]).numpy()
-        self.create_tensorflow_graph(gpinput,gradient = gradient,slope = 500000,matrix_size = self.matrix_size)
+        # self.create_tensorflow_graph(gpinput,gradient = gradient,slope = 500000,matrix_size = self.matrix_size)
         
 
     def compute_model(self,surface_points = None,gradient = False):
@@ -390,26 +401,6 @@ class ModelTF(DataMutation):
         sol = final_block,final_property,block_matrix,block_mask,size,Z_x,sfai
         self.set_solutions(sol)
 
-        # if self._grid.active_grids[0] == True:
-        #     regular = self._grid.get_grid_args('regular')
-        #     self.solutions.lith_block = (final_block[regular[0]:regular[1]]).numpy()
-
-        
-        # self.solutions.scalar_field_matrix = self.TFG.scalar_matrix[:,regular[0]:regular[1]].numpy()
-        # self.solutions.mask_matrix = block_mask[:,regular[0]:regular[1]].numpy()>0
-        # self.solutions.scalar_field_at_surface_points = self.TFG.sfai.numpy()
-        # self.solutions._grid = self._grid
-        # self.solutions.grid = self._grid
-        
-        # l0, l1 = self.solutions.grid.get_grid_args('sections')
-
-        # self.solutions.sections = np.array(
-        #     [final_block[l0: l1].numpy(), self.TFG.scalar_matrix[:, l0: l1].numpy().astype(float)])
-        
-        # self.solutions.compute_all_surfaces()
-
-        # self.set_surface_order_from_solution()
-
     @tf.function
     def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,gradient = False,Hessian = False,method = None,window_resolution = None,grav_only = False):
         implemented_methods_lst = ['conv_all','kernel_reg','kernel_geom','kernel_ml']
@@ -421,9 +412,8 @@ class ModelTF(DataMutation):
         if surface_points is None:
             surface_points = self.surface_points_coord
         if method == 'conv_all':
-            # resolution_ = tf.constant(self.geo_data.grid.regular_grid.resolution,dtype = tf.int32)
+
             size = tf.reduce_prod(self.resolution_,name = 'reduce_prod_size_')
-            # size = tf.reduce_prod(self.geo_data.grid.regular_grid.resolution,name = 'reduce_prod_size_')
 
             final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
                         self.dips_position,
@@ -465,14 +455,39 @@ class ModelTF(DataMutation):
             densities = final_property[:size]
 
             grav = self.TFG.compute_forward_gravity(tz, 0, size, densities)
+
+        
         if grav_only == True:
             return grav
         else:
             return final_block,final_property,block_matrix,block_mask,size,Z_x,sfai,grav
     
+    def revert_coordinates_alongz(self,values):
+        value_dim = 3
+        values = values.reshape(list(self.resolution)+[value_dim]) 
+        values = np.flip(values, value_dim-1)
+        values = values.reshape([-1,value_dim])
+        return values
+
+    def revert_value_alongz(self,values):
+        if len(values.shape)>1:
+            value_dim = values.shape[0]
+            values = values.reshape([value_dim]+list(self.resolution)) 
+            values = np.flip(values, 2)
+            values = values.reshape([value_dim,-1])
+        else:
+            value_dim = 0
+            values = values.reshape(list(self.resolution)) 
+            values = np.flip(values, 2)
+            values = values.reshape([-1])
+        return values
+
     def set_solutions(self,sol):
         # final_block,final_property,block_matrix,block_mask,size,Z_x,sfai,grav = sol
         ## unzip the solutions
+
+
+
         final_block  = sol[0]
         final_property = sol[1]
         block_matrix = sol[2]
@@ -482,17 +497,25 @@ class ModelTF(DataMutation):
         sfai = sol[6]
 
         self.grid = self._grid
+        self.grid.regular_grid.values = self.revert_coordinates_alongz(self.grid.regular_grid.values)
+        self.grid.regular_grid.values_r = self.revert_coordinates_alongz(self.grid.regular_grid.values_r)
+        # self._grid.regular_grid.values = self.revert_coordinates_alongz(self._grid.regular_grid.values)
+        # self._grid.regular_grid.values_r = self.revert_coordinates_alongz(self._grid.regular_grid.values_r)
         if self._grid.active_grids[0] == True:
             regular = self._grid.get_grid_args('regular')
-            self.solutions.lith_block = (sol[0][regular[0]:regular[1]]).numpy()
+            lith = (sol[0][regular[0]:regular[1]]).numpy().astype(int)
+            # lith = self.revert_value_alongz(lith)
+            self.solutions.lith_block = (lith)
 
         
         self.solutions.values_matrix = final_property[:size].numpy()
         self.solutions.scalar_field_matrix = Z_x[:,regular[0]:regular[1]].numpy()
+        # self.solutions.values_matrix = self.revert_value_alongz(final_property[:size].numpy())
+        # self.solutions.scalar_field_matrix = self.revert_value_alongz(Z_x[:,regular[0]:regular[1]].numpy())
         self.solutions.mask_matrix = block_mask[:,regular[0]:regular[1]].numpy()>0
         self.solutions.scalar_field_at_surface_points = sfai.numpy()
-        self.solutions._grid = self._grid
-        self.solutions.grid = self._grid
+        self.solutions._grid = self.grid
+        self.solutions.grid = self.grid
         self.solutions.block_matrix = block_matrix[:,regular[0]:regular[1]].numpy()
         
         l0, l1 = self.solutions.grid.get_grid_args('sections')

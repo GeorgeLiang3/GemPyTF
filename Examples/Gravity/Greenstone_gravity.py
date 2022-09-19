@@ -94,3 +94,5 @@ grav_np = grav.numpy().reshape(grav_res,grav_res)
 # %%
 f,ax = gp.plot_grav(model,receivers,grav_np,diff =False,figsize = (14,5))
 plt.show()
+
+# %%
