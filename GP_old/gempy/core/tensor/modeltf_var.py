@@ -75,11 +75,7 @@ class ModelTF(DataMutation):
 
         self.fault_drift = tf.convert_to_tensor(fault_drift,dtype=self.tfdtype)
         self.grid_tensor = tf.convert_to_tensor(grid,dtype=self.tfdtype)
-        # if values_properties.shape[0] > 1:
-        #     self.densities = tf.Variable(values_properties[0],dtype=self.tfdtype,name = 'densities')
-        #     lith_label = tf.constant(values_properties[1],dtype=self.tfdtype,name = 'lith_label')
-        #     self.values_properties = tf.stack([lith_label,self.densities],axis = 0)
-        # else: 
+
         self.values_properties = tf.constant(values_properties,dtype=self.tfdtype)
 
         self.len_rest_form = tf.convert_to_tensor(len_rest_form,dtype=self.tfdtype)
@@ -95,6 +91,9 @@ class ModelTF(DataMutation):
         
         self.lg_0 = self.interpolator.grid.get_grid_args('centered')[0]
         self.lg_1 = self.interpolator.grid.get_grid_args('centered')[1]
+
+
+        self.resolution_ = tf.constant(self.geo_data.grid.regular_grid.resolution,tf.int32,name = 'Const_resolution')
         
     def activate_centered_grid(self,):
         self.geo_data.grid.deactivate_all_grids()
@@ -109,7 +108,7 @@ class ModelTF(DataMutation):
         # self.geo_data.grid.set_active(['sections'])
         self.geo_data.update_from_grid()
         self.grid = self.geo_data.grid
-        self.resolution_ = tf.constant(self.geo_data.grid.regular_grid.resolution,tf.int32,name = 'Const_resolution')
+        
         self.from_gempy_interpolator()
 
         # rotate the grid along z axis, to keep consistency with kernel grid

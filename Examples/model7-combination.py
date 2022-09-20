@@ -4,7 +4,7 @@ sys.path.append('../GP_old/')
 
 import gempy as gp
 
-from gempy.core.tensor.modeltf import ModelTF
+from gempy.core.tensor.modeltf_var import ModelTF
 
 # %%
 data_path = 'https://raw.githubusercontent.com/cgre-aachen/gempy_data/master/'
@@ -26,6 +26,7 @@ geo_data.set_is_fault(['Fault_Series'])
 ## I will integrate the module into GemPy through Interpolator later
 
 model = ModelTF(geo_data)
+model.activate_regular_grid()
 gpinput = model.get_graph_input()
 model.create_tensorflow_graph(gpinput,gradient = False)
 

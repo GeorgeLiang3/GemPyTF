@@ -752,11 +752,11 @@ class TFGraph(tf.Module):
         
         # tf.print('formations_block:',formations_block)
             
-        if self.gradient is True:
-            ReLU_up = - 0.01 * tf.nn.relu(Z_x - scalar_field_iter[1])
-            ReLU_down = 0.01 * tf.nn.relu( scalar_field_iter[-2]-Z_x)
+        # if self.gradient is True:
+        #     ReLU_up = - 0.01 * tf.nn.relu(Z_x - scalar_field_iter[1])
+        #     ReLU_down = 0.01 * tf.nn.relu( scalar_field_iter[-2]-Z_x)
 
-            formations_block += ReLU_down + ReLU_up
+        #     formations_block += ReLU_down + ReLU_up
         return formations_block
 
     # @tf.function

@@ -46,7 +46,7 @@ gp._plot.plot_3d(model,show_lith = True)
 model1 = ModelTF(geo_data)
 model1.activate_regular_grid()
 gpinput = model1.get_graph_input()
-model1.create_tensorflow_graph(gpinput,slope = 300, gradient = True,compute_gravity = True,min_slope = 400)
+model1.create_tensorflow_graph(gpinput,slope = 300, gradient = True,compute_gravity = True,min_slope = 400000)
 model1.compute_model()
 
 # %%
