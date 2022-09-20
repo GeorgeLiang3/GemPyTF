@@ -28,8 +28,13 @@ geo_data.modify_order_surfaces(2,0)
 
 # geo_data.surface_points.modify_surface_points(21,Z = 600,surface = 'rock2')
 # %%
+## modify one surface point
+
+# geo_data.surface_points.modify_surface_points(21,Z = 600,surface = 'rock2')
+# %%
 ## I will integrate the module into GemPy through Interpolator later
 model = ModelTF(geo_data)
+model.activate_regular_grid()
 gpinput = model.get_graph_input()
 model.create_tensorflow_graph(gpinput,gradient = False)
 

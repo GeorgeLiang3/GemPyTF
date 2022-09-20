@@ -16,10 +16,11 @@ geo_data = gp.create_data( extent=[0, 1000, 0, 1000, 0, 1000], resolution=[50, 5
 
 
 map_series_to_surfaces(geo_data, {"Strat_Series": ('rock2', 'rock1'), "Basement_Series": ('basement')})
-geo_data.add_surface_values([1.0,4.0,2.0])
+# geo_data.add_surface_values([1.0,4.0,2.0])
 # %%
 ## I will integrate the module into GemPy through Interpolator later
 model = ModelTF(geo_data)
+model.activate_regular_grid()
 gpinput = model.get_graph_input()
 model.create_tensorflow_graph(gpinput,gradient = False)
 
