@@ -4,7 +4,7 @@ sys.path.append('../../GP_old/')
 
 import numpy as np
 import gempy as gp
-from gempy.core.tensor.modeltf import ModelTF
+from gempy.core.tensor.modeltf_var import ModelTF
 from gempy.assets.geophysics import *
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -30,24 +30,25 @@ gp.map_series_to_surfaces(
 geo_data.add_surface_values([2.61, 2.92, 3.1, 2.92, 2.61])
 # %%
 model = ModelTF(geo_data)
-
-## COMPILE AND COMPUTE MODEL
+model.activate_regular_grid()
+gpinput = model.get_graph_input()
+model.create_tensorflow_graph(gpinput,slope = 300000, gradient = False,compute_gravity = True,min_slope = 400)
 model.compute_model()
+
 # %%
-p = gp.plot.plot_section(model, 21,
+p = gp.plot.plot_section(model, 35,
                       show_data=True,direction="x",
                      cmap='viridis', show_grid=True, norm=None,colorbar = True)
 
-
+# %%
 ## 3D PLOT IN PYVISTA
-# gp._plot.plot_3d(model)
+gp._plot.plot_3d(model)
 # %%
 ## CONFIGURE RECEIVER LOCATIONS
 grav_res = 10
 X_r = np.linspace(704000,740000,grav_res)
 Y_r = np.linspace(6.87e6,6.92e6,grav_res)
-# X_r = [716000] 
-# Y_r = [6881111.1111111]
+
 r = []
 for x in X_r:
   for y in Y_r:
