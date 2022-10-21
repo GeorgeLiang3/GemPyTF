@@ -17,14 +17,14 @@ tf.config.run_functions_eagerly(True)
 # %%
 data_path = 'https://raw.githubusercontent.com/cgre-aachen/gempy_data/master/'
 path_to_data = data_path + "/data/input_data/jan_models/"
-geo_data = gp.create_data( extent=[0, 1000, 0, 1000, 0, 1000], resolution=[50, 50, 50],
+geo_data = gp.create_data( extent=[-500, 1500, -500, 1500, 0, 1000], resolution=[50, 50, 50],
                           path_o=path_to_data + "model2_orientations.csv",
                           path_i=path_to_data + "model2_surface_points.csv")
 
 
 gp.map_series_to_surfaces(geo_data, {"Strat_Series": ('rock2', 'rock1'), "Basement_Series": ('basement')})
 
-geo_data.add_surface_values([4.0,1.0,2.0])
+geo_data.add_surface_values([1.0,4.0,2.0])
 geo_data.modify_order_surfaces(2,0)
 
 # %%
@@ -43,8 +43,44 @@ model.create_tensorflow_graph(gpinput,gradient = False,compute_gravity = True)
 model.compute_model()
 
 # %%
+
+grav_res = 5
+X_r = np.linspace(0,1000,grav_res)
+Y_r = np.linspace(0,1000,grav_res)
+# X_r = [500]
+# Y_r = [500]
+
+r = []
+for x in X_r:
+    for y in Y_r:
+        r.append(np.array([x,y]))
+
+Z_r = 1000 # at the top surface
+xyz = np.meshgrid(X_r, Y_r, Z_r)
+xy_ravel = np.vstack(list(map(np.ravel, xyz))).T
+
+from gempy.plot.vista import GemPyToVista
+import pyvista as pv
+
+# Initialize receivers
+poly = pv.PolyData(xy_ravel)
+geom = pv.Cone(direction=[0.0, 0.0, -1.0])
+glyphs = poly.glyph(factor=50.0,geom=geom)
+
+gpv = GemPyToVista(model)
+gpv.plot_surface_points(surfaces='all')
+gpv.p.add_mesh(glyphs, color="FFCC99",render_points_as_spheres=True,point_size=1000) # add receivers to mesh
+gpv.plot_structured_grid('lith',render_topography=False)
+gpv.plot_surface_points(point_size = 20)
+gpv.plot_orientations()
+gpv.plot_surfaces()
+
+gpv.p.add_bounding_box()
+
+gpv.p.show()
+# %%
 # # 3D plot
-# model._grid.regular_grid.values = model.revert_coordinates_alongz(model._grid.regular_grid.values)
+
 gp._plot.plot_3d(model,show_lith = True)
 
 # %%

@@ -24,6 +24,7 @@ Created on 23/09/2016
 @author: Miguel de la Varga, Elisa Heim
 """
 
+from turtle import title
 import warnings
 import os
 import numpy as np
@@ -960,6 +961,7 @@ class PlotSolution(PlotData2D):
 
         sliced_block = plot_block[_a, _b, _c].T
 
+        # Clean up the kwargs
         imshow_kwargs = kwargs.copy()
         if 'show_grid' in imshow_kwargs:
             imshow_kwargs.pop('show_grid')
@@ -969,6 +971,8 @@ class PlotSolution(PlotData2D):
             imshow_kwargs.pop('grid_linewidth')
         if 'colorbar' in imshow_kwargs:
             imshow_kwargs.pop('colorbar')
+        if 'cbar_title' in imshow_kwargs:
+            imshow_kwargs.pop('cbar_title')
         # if 'figsize' in imshow_kwargs:
         #     imshow_kwargs.pop('figsize')
         #     plt.figure(figsize = kwargs['figsize'])
@@ -1033,7 +1037,12 @@ class PlotSolution(PlotData2D):
                 ax = plt.gca()
                 divider = make_axes_locatable(ax)
                 cax = divider.append_axes("right", size="5%", pad=0.4)
-                plt.colorbar(im, cax=cax)
+                cbar = plt.colorbar(im, cax=cax)
+                
+                if 'cbar_title' in kwargs:
+                    ctitle = kwargs['cbar_title']
+                    cbar.set_label(ctitle, rotation=270, labelpad=10)
+
                 # plt.colorbar(im)
 
         # plt.show()

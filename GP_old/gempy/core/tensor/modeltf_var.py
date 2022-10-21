@@ -356,15 +356,15 @@ class ModelTF(DataMutation):
                 mask_matrix,
                 block_matrix]
     
-    def create_tensorflow_graph(self, input, slope = 100000, gradient = False,compute_gravity = False,matrix_size = None,min_slope = None):
+    def create_tensorflow_graph(self, input, slope = 100000, gradient = False,compute_gravity = False,matrix_size = None,max_slope = None):
         '''
             'matrix_size': specify the operating matrix size, if None, the Tensorflow will infer the size dynamically
-            'min_slope': minimum slope to allow the gradient to be kept during the learning  
+            'max_slope': Maximum slope to allow the gradient to be kept during the learning  
         '''
         self.TFG = TFGraph(input, self.fault_drift,
                 self.grid_tensor, self.values_properties, self.nugget_effect_grad,self.nugget_effect_scalar, self.Range,
                 self.C_o, self.rescale_factor,delta_slope = slope, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity,
-                matrix_size = matrix_size,min_slope = min_slope)
+                matrix_size = matrix_size,max_slope = max_slope)
     
     # def calculate_grav(self,surface_coord, values_properties):
     
@@ -387,11 +387,15 @@ class ModelTF(DataMutation):
         # self.create_tensorflow_graph(gpinput,gradient = gradient,slope = 500000,matrix_size = self.matrix_size)
         
 
-    def compute_model(self,surface_points = None,gradient = False):
+    def compute_model(self,surface_points = None,dip_angles = None,gradient = False):
         self.prepare_input(gradient,surface_points)
-        final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(self.surface_points_,
+        if surface_points is None:
+            surface_points = self.surface_points_coord
+        if dip_angles is None:
+            dip_angles = self.dip_angles
+        final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
                     self.dips_position,
-                    self.dip_angles,
+                    dip_angles,
                     self.azimuth,
                     self.polarity,)
         
@@ -400,8 +404,8 @@ class ModelTF(DataMutation):
         sol = final_block,final_property,block_matrix,block_mask,size,Z_x,sfai
         self.set_solutions(sol)
 
-    @tf.function
-    def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,gradient = False,Hessian = False,method = None,window_resolution = None,grav_only = False):
+    # @tf.function
+    def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,dip_angles = None,gradient = False,Hessian = False,method = None,window_resolution = None,grav_only = False,LOOP_FLAG = True, values_properties = None):
         implemented_methods_lst = ['conv_all','kernel_reg','kernel_geom','kernel_ml']
         if method in implemented_methods_lst: 
             pass   
@@ -410,18 +414,26 @@ class ModelTF(DataMutation):
 
         if surface_points is None:
             surface_points = self.surface_points_coord
+        if dip_angles is None:
+            dip_angles = self.dip_angles
         if method == 'conv_all':
 
             size = tf.reduce_prod(self.resolution_,name = 'reduce_prod_size_')
 
             final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
                         self.dips_position,
-                        self.dip_angles,
+                        dip_angles,
                         self.azimuth,
-                        self.polarity)
+                        self.polarity,
+                        values_properties = values_properties)
 
             # densities = final_property[0:size] # slice the density by resolution
             densities = tf.strided_slice(final_property,[0],[size],[1],name = 'ss_w_den_') # This fix the 'Const_4' int64_val : 1 when print the graph
+
+            # Flip the value matrix along Z axis
+            densities = self.revert_value_alongz(densities)
+
+            # Find the receiver position at the model coordinates
             center_index_x = tf.constant((g.new_xy_ravel[0]-receivers.extent[0])//g.dx,self.tfdtype,name = 'center_index_x')
             center_index_y = tf.constant((g.new_xy_ravel[1]-receivers.extent[2])//g.dy,self.tfdtype,name = 'center_index_y')
             grav_convolution_full = tf.TensorArray(self.tfdtype, size=receivers.n_devices, dynamic_size=False, clear_after_read=True)
@@ -443,17 +455,34 @@ class ModelTF(DataMutation):
 
 
         if method == 'kernel_reg':
+            # The performance in backpropogation differs a lot with vectorized and iterative computation. Here the iterative computation is used to generate High resolution data in CPU. 
+            if LOOP_FLAG == False:
+                # Vectorized computation
+                final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
+                            self.dips_position,
+                            dip_angles,
+                            self.azimuth,
+                            self.polarity,
+                            values_properties = values_properties)
+                size = kernel.values.shape[0]
+                densities = final_property[:size]
 
+                grav = self.TFG.compute_forward_gravity(tz, 0, size, densities)
+            else:
+                # Iterative computation
+                grav = tf.TensorArray(self.tfdtype, size=receivers.n_devices, dynamic_size=False, clear_after_read=True)
+                for i in tf.range(receivers.n_devices):
+                    final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
+                            self.dips_position,
+                            dip_angles,
+                            self.azimuth,
+                            self.polarity,)
+                    size = tz.shape[0]
+                    windowed_densities = final_property[i*size:(i+1)*size]
+                    grav_ = self.TFG.compute_forward_gravity(tz, 0, size, windowed_densities)
+                    grav = grav.write(i, grav_)
+                grav = tf.squeeze(grav.stack())
 
-            final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
-                        self.dips_position,
-                        self.dip_angles,
-                        self.azimuth,
-                        self.polarity,)
-            size = kernel.values.shape[0]
-            densities = final_property[:size]
-
-            grav = self.TFG.compute_forward_gravity(tz, 0, size, densities)
 
         
         if grav_only == True:
@@ -476,9 +505,12 @@ class ModelTF(DataMutation):
             values = values.reshape([value_dim,-1])
         else:
             value_dim = 0
-            values = values.reshape(list(self.resolution)) 
-            values = np.flip(values, 2)
-            values = values.reshape([-1])
+            # values = values.reshape(list(self.resolution)) 
+            # values = np.flip(values, 2)
+            # values = values.reshape([-1])
+            values = tf.reshape(values,self.resolution)
+            values = tf.reverse(values, [2])
+            values = tf.reshape(values,[-1])
         return values
 
     def set_solutions(self,sol):

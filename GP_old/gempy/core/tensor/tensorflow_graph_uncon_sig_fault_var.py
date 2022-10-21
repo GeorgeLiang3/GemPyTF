@@ -39,9 +39,9 @@ class TFGraph(tf.Module):
         # -------
         self.gradient = kwargs.get('gradient', True)
         self.gravity = kwargs.get('gravity', False)
-        if kwargs.get('min_slope'):
-            self.min_slope = tf.constant(kwargs.get('min_slope'),self.dtype)
-        else: self.min_slope = 0
+        if kwargs.get('max_slope'):
+            self.max_slope = tf.constant(kwargs.get('max_slope'),self.dtype)
+        else: self.max_slope = 0
 
         # CONSTANT PARAMETERS FOR ALL SERIES
         # KRIGING
@@ -82,26 +82,10 @@ class TFGraph(tf.Module):
 
             self.delta_slope = tf.Variable(delta_slope,dtype = self.dtype,name = 'delta_slope')
             
-
-            # self.sig_slope = tf.Variable(slope,dtype = self.dtype,name = 'sigmoid_slope') # default in Gempy 50
         else:
  
             self.delta_slope = tf.constant(delta_slope,dtype = self.dtype,name = 'delta_slope')
 
-            # self.sig_slope = tf.constant(
-            #     50000, dtype=self.dtype, name='Sigmoid_slope')
-            # self.not_l = tf.constant(
-            #     50, dtype=self.dtype, name='Sigmoid_Outside')
-            # self.ellipse_factor_exponent = tf.constant(
-            #     2, dtype=self.dtype, name='Attenuation_factor')
-
-        # self.dip_angles_all = dip_angles
-        # self.azimuth_all = azimuth
-        # self.polarity_all = polarity
-
-        # self.dip_angles = self.dip_angles_all
-        # self.azimuth = self.azimuth_all
-        # self.polarity = self.polarity_all
 
         self.number_of_series = tf.constant(1,dtype = tf.int32,name = 'number_of_series')
 
@@ -115,7 +99,6 @@ class TFGraph(tf.Module):
 
         self.grid_val = grid
 
-        # self.fault_matrix = fault_drift
 
 
         if output is None:
@@ -784,7 +767,7 @@ class TFGraph(tf.Module):
         scalar_field_results = sigma_0_grad + sigma_0_interf + f_0 + f_1
         return scalar_field_results
               
-    @tf.function
+    # @tf.function
     def compute_a_series(self,surface_point_all,dips_position_all,dip_angles_all,azimuth_all,polarity_all,value_properties,
                          len_i_0=0, len_i_1=None,
                          len_f_0=0, len_f_1=None,
@@ -979,12 +962,17 @@ class TFGraph(tf.Module):
         # return self.block_matrix, self.scalar_matrix, self.sfai, self.mask_matrix, \
         #       self.fault_matrix, nsle
 
-    @tf.function
-    def compute_series(self,surface_point_all,dips_position_all,dip_angles, azimuth, polarity):
+    # @tf.function
+    def compute_series(self,surface_point_all,dips_position_all,dip_angles, azimuth, polarity, values_properties = None):
         
         self.update_property()
         if self.gradient:
-            self.sig_slope = self.min_slope - tf.abs(self.delta_slope) # default in Gempy 50
+            # self.sig_slope = self.max_slope - tf.abs(self.delta_slope) # default in GemPy 50 when select gravity calculation
+            ##### Define the slope between 0 and min_slope, connected by another sigmoid function
+            ##### 0 <- delta_slope is most trainable, but may lose accuracy
+            ##### delta_slope -> max_slope is the least to keep gradient
+
+            self.sig_slope = self.max_slope*tf.math.sigmoid(self.delta_slope)
         else:
             self.sig_slope = self.delta_slope
 
@@ -1030,10 +1018,13 @@ class TFGraph(tf.Module):
         #             nsle=0, grid=None,
         #             shift=None)
 
+        if values_properties is None:
+            values_properties = self.value_properties
+
         i0 = tf.constant(0, name = 'i0') # i = 0
         c = lambda i,block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix: tf.less(i, num_series) # while i < 2
         def loop_body(i,block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix):
-            block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix = self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,self.value_properties,
+            block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix = self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,  values_properties,
                     len_i_0=tf.strided_slice(self.len_series_i,[i],[i+1],[1],name = 'len_i_0')[0], len_i_1=tf.strided_slice(self.len_series_i,[i+1],[i+2],[1],name = 'len_i_1')[0],
                     len_f_0=self.len_series_o[i], len_f_1=self.len_series_o[i+1],
                     len_w_0=self.len_series_w[i], len_w_1=self.len_series_w[i+1],
