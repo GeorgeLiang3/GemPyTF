@@ -41,7 +41,7 @@ class TFGraph(tf.Module):
         self.gravity = kwargs.get('gravity', False)
         if kwargs.get('max_slope'):
             self.max_slope = tf.constant(kwargs.get('max_slope'),self.dtype)
-        else: self.max_slope = 0
+        else: self.max_slope = 50
 
         # CONSTANT PARAMETERS FOR ALL SERIES
         # KRIGING

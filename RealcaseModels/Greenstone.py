@@ -5,7 +5,7 @@ sys.path.append('../GP_old/')
 import gempy as gp
 
 from gempy import map_series_to_surfaces
-from gempy.core.tensor.modeltf import ModelTF
+from gempy.core.tensor.modeltf_var import ModelTF
 
 # %%
 geo_model = gp.create_model('Greenstone')
@@ -27,8 +27,9 @@ geo_model.add_surface_values([2.61, 2.92, 3.1, 2.92, 2.61])
 
 # %%
 model = ModelTF(geo_model)
+model.activate_regular_grid()
 gpinput = model.get_graph_input()
-model.create_tensorflow_graph(gpinput,gradient = False)
+model.create_tensorflow_graph(gpinput, gradient = False,)
 # %%
 model.compute_model()
 # %%

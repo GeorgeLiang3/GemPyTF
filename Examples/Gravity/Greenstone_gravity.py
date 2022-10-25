@@ -32,11 +32,11 @@ geo_data.add_surface_values([2.61, 2.92, 3.1, 2.92, 2.61])
 model = ModelTF(geo_data)
 model.activate_regular_grid()
 gpinput = model.get_graph_input()
-model.create_tensorflow_graph(gpinput,slope = 300000, gradient = False,compute_gravity = True,min_slope = 400)
+model.create_tensorflow_graph(gpinput,delta = 300000, gradient = False,compute_gravity = True,max_slope = 400)
 model.compute_model()
 
 # %%
-p = gp.plot.plot_section(model, 35,
+p = gp.plot.plot_section(model, 30,
                       show_data=True,direction="x",
                      cmap='viridis', show_grid=True, norm=None,colorbar = True)
 
@@ -68,25 +68,26 @@ receivers = Receivers(radius,extent,xy_ravel,kernel_resolution = kernel_resoluti
 ## Different gravity schemes are implemented. The kernel preparation is separated out to exclude it out of the computational graph.
 
 ## Convolute Over All Regular Grid
-model.activate_regular_grid()
-gpinput = model.get_graph_input()
-model.create_tensorflow_graph(gpinput,gradient=True,compute_gravity=True)
-g = GravityPreprocessingRegAllLoop(receivers,model.geo_data.grid.regular_grid)
-tz = g.set_tz_kernel()
-tz = tf.constant(tz,model.tfdtype)
-print(tz)
-grav = model.compute_gravity(tz,g = g,receivers = receivers,method = 'conv_all',grav_only = True)
+# model.activate_regular_grid()
+# gpinput = model.get_graph_input()
+# model.create_tensorflow_graph(gpinput,gradient=True,compute_gravity=True)
+# g = GravityPreprocessingRegAllLoop(receivers,model.geo_data.grid.regular_grid)
+# tz = g.set_tz_kernel()
+# tz = tf.constant(tz,model.tfdtype)
+# print(tz)
+# grav = model.compute_gravity(tz,g = g,receivers = receivers,method = 'conv_all',grav_only = True)
 
 ## Kernel Regular Grid
-# from gempy.core.grid_modules.grid_types import CenteredRegGrid
-# centerReg_kernel = CenteredRegGrid(receivers.xy_ravel,radius=receivers.model_radius,resolution=[25,25,25])
-# model.activate_customized_grid(centerReg_kernel)
-# gpinput = model.get_graph_input()
-# model.create_tensorflow_graph(gpinput,slope = 100000,gradient=True,compute_gravity=True)
-# g_center_regulargrid = GravityPreprocessing(centerReg_kernel)
-# tz_center_regulargrid = tf.constant(g_center_regulargrid.set_tz_kernel(),model.tfdtype)
-# tz = tf.constant(tz_center_regulargrid,model.tfdtype)
-# grav = model.compute_gravity(tz,kernel = centerReg_kernel,receivers = receivers,method = 'kernel_reg')
+## RECOMMENDED USING GPU 
+from gempy.core.grid_modules.grid_types import CenteredRegGrid
+centerReg_kernel = CenteredRegGrid(receivers.xy_ravel,radius=receivers.model_radius,resolution=[25,25,25])
+model.activate_customized_grid(centerReg_kernel)
+gpinput = model.get_graph_input()
+model.create_tensorflow_graph(gpinput,delta = 100000,gradient=True,compute_gravity=True)
+g_center_regulargrid = GravityPreprocessing(centerReg_kernel)
+tz_center_regulargrid = tf.constant(g_center_regulargrid.set_tz_kernel(),model.tfdtype)
+tz = tf.constant(tz_center_regulargrid,model.tfdtype)
+grav = model.compute_gravity(tz,kernel = centerReg_kernel,receivers = receivers,method = 'kernel_reg')
 
 # %%
 import matplotlib.pyplot as plt

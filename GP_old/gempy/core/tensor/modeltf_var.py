@@ -356,14 +356,15 @@ class ModelTF(DataMutation):
                 mask_matrix,
                 block_matrix]
     
-    def create_tensorflow_graph(self, input, slope = 100000, gradient = False,compute_gravity = False,matrix_size = None,max_slope = None):
+    def create_tensorflow_graph(self, input, delta = 100000, gradient = False,compute_gravity = False,matrix_size = None,max_slope = None):
         '''
             'matrix_size': specify the operating matrix size, if None, the Tensorflow will infer the size dynamically
+            'delta': controls the magnitude of the slope, [-inf,inf] -> [0,max_slope]
             'max_slope': Maximum slope to allow the gradient to be kept during the learning  
         '''
         self.TFG = TFGraph(input, self.fault_drift,
                 self.grid_tensor, self.values_properties, self.nugget_effect_grad,self.nugget_effect_scalar, self.Range,
-                self.C_o, self.rescale_factor,delta_slope = slope, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity,
+                self.C_o, self.rescale_factor,delta_slope = delta, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity,
                 matrix_size = matrix_size,max_slope = max_slope)
     
     # def calculate_grav(self,surface_coord, values_properties):

@@ -32,3 +32,6 @@ current version has
 - <s>3D color map is in wrong order </s> (fixed)
 - <s>2D plot function `show_data` function not correct</s> (fixed)
 - Hessian in graph mode is limited
+### References
+- **Original GemPy paper**: de la Varga, M., Schaaf, A. and Wellmann, F., 2019. GemPy 1.0: open-source stochastic geological modeling and inversion. Geoscientific Model Development, 12(1), pp.1-32.
+- **Hessian MCMC used GemPyTF**: Liang, Z., Wellmann, F. and Ghattas, O., 2022. Uncertainty quantification of geological model parameters in 3D gravity inversion by Hessian-informed Markov chain Monte Carlo. Geophysics, 88(1), pp.1-78.
