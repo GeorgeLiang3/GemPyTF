@@ -83,7 +83,6 @@ class TFGraph(tf.Module):
             self.delta_slope = tf.Variable(delta_slope,dtype = self.dtype,name = 'delta_slope')
             
         else:
- 
             self.delta_slope = tf.constant(delta_slope,dtype = self.dtype,name = 'delta_slope')
 
 
@@ -974,7 +973,7 @@ class TFGraph(tf.Module):
 
             self.sig_slope = self.max_slope*tf.math.sigmoid(self.delta_slope)
         else:
-            self.sig_slope = self.delta_slope
+            self.sig_slope = 5e10 # if 
 
         self.ref_layer_points_all, self.rest_layer_points_all, self.ref_nugget, self.rest_nugget = self.set_rest_ref_matrix(
             self.number_of_points_per_surface_T, surface_point_all, self.nugget_effect_scalar)

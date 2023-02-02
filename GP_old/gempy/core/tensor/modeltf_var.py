@@ -9,14 +9,17 @@ from gempy.core.grid_modules.grid_types import CenteredRegGrid
 import copy
 
 class ModelTF(DataMutation):
-    def __init__(self,geo_data) -> None:
+    def __init__(self,geo_data,dtype ='float64') -> None:
         super().__init__()
         # geo_data.surfaces.df.sort_values(by=['order_surfaces'], inplace=True, ascending=False)
         # geo_data.surfaces.update_id()
 
         self.geo_data = geo_data
-        self.tfdtype = tf.float64
-        self.dtype = 'float64'
+        if dtype == 'float64':
+            self.tfdtype = tf.float64
+        elif dtype == 'float32':
+            self.tfdtype = tf.float32
+        self.dtype = dtype
         self.from_gempy_interpolator()
     def from_gempy_interpolator(self):
         self.interpolator = self.geo_data.interpolator

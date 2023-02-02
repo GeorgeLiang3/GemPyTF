@@ -1,11 +1,13 @@
 # %%
 import sys
 sys.path.append('../GP_old/')
+sys.path.append('./GP_old/')
 
 import gempy as gp
+import tensorflow as tf
 
-from gempy import map_series_to_surfaces
-from gempy.core.tensor.modeltf import ModelTF
+# from gempy import map_series_to_surfaces
+from gempy.core.tensor.modeltf_var import ModelTF
 
 import pandas as pn
 # %%
@@ -40,9 +42,10 @@ geo_model = gp.init_data(geo_model,
 new_range = geo_model.get_additional_data().loc[('Kriging', 'range'), 'values'] * 0.2
 geo_model.modify_kriging_parameters('range', new_range)
 # %%
-model = ModelTF(geo_model)
+model = ModelTF(geo_model,dtype = 'float32')
+model.activate_regular_grid()
 gpinput = model.get_graph_input()
-model.create_tensorflow_graph(gpinput,gradient = False)
+model.create_tensorflow_graph(gpinput,gradient = False,max_slope = 5e10)
 # %%
 model.compute_model()
 # %%
@@ -51,4 +54,6 @@ gp._plot.plot_3d(model)
 
 # %%
 # Plot the top surface lithlogy
-gp._plot.plot_2d(model,cell_number = [49],show_data = True,direction = ['z'],figsize = (10,10))
+gp._plot.plot_2d(model,cell_number = [19],show_data = True,direction = ['x'],figsize = (20,20))
+
+# %%

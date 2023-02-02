@@ -45,7 +45,7 @@ p = gp.plot.plot_section(model, 30,
 gp._plot.plot_3d(model)
 # %%
 ## CONFIGURE RECEIVER LOCATIONS
-grav_res = 10
+grav_res = 1
 X_r = np.linspace(704000,740000,grav_res)
 Y_r = np.linspace(6.87e6,6.92e6,grav_res)
 
@@ -59,8 +59,8 @@ n_devices = receivers.shape[0]
 xyz = np.meshgrid(X_r, Y_r, Z_r)
 xy_ravel = np.vstack(list(map(np.ravel, xyz))).T
 
-radius = [5000,5000,20200]
-kernel_resolution = [25,25,25]
+radius = [5000,10000,20200]
+kernel_resolution = [10,4,3]
 receivers = Receivers(radius,extent,xy_ravel,kernel_resolution = kernel_resolution,grav_res = grav_res)
 
 # %%
@@ -80,7 +80,7 @@ receivers = Receivers(radius,extent,xy_ravel,kernel_resolution = kernel_resoluti
 ## Kernel Regular Grid
 ## RECOMMENDED USING GPU 
 from gempy.core.grid_modules.grid_types import CenteredRegGrid
-centerReg_kernel = CenteredRegGrid(receivers.xy_ravel,radius=receivers.model_radius,resolution=[25,25,25])
+centerReg_kernel = CenteredRegGrid(receivers.xy_ravel,radius=receivers.model_radius,resolution=kernel_resolution)
 model.activate_customized_grid(centerReg_kernel)
 gpinput = model.get_graph_input()
 model.create_tensorflow_graph(gpinput,delta = 100000,gradient=True,compute_gravity=True)
