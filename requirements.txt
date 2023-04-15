@@ -1,0 +1,9 @@
+tensorflow == 2.9.0
+tensorflow-probability == 0.16.0
+pandas
+scipy 
+nptyping == 1.0.1
+seaborn
+scikit-image == 0.17.2
+pyvista == 0.29.0 
+vtk == 9.1.0 
