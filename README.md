@@ -7,18 +7,39 @@ GemPy is the most popular Python-based 3-D structural geological modeling open-s
 Try the simple demos in colab: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GeorgeLiang3/GemPyTF/blob/main/GemPyTF_demo.ipynb)
 
 ## Installation and dependency
-The current version is depend on an older version of GemPy-'2.1.1'
+The current version is depend on an older version of GemPy-'2.1.1', but no prior installation of GemPy.
 
-TODO: Test and wrap this in a single installation file as e.g. `requirements.txt`
-- create conda environment `conda create --name gempytf python==3.7`
-- `git clone https://github.com/GeorgeLiang3/GemPyTF.git`
-- `pip install --upgrade pip`
-- `pip install tensorflow`
-- `conda install pandas`
-- `conda install scipy`
-- `pip install nptyping==1.0.1`
-- `conda install seaborn`
-- skimage < '0.18.2' and for MacOS < 10.13.6 need older skimage version `pip install -U scikit-image==0.17.2  ` [stackoverflow answer](https://stackoverflow.com/questions/65431999/it-seems-that-scikit-learn-has-not-been-built-correctly)
+_The following commands should be executed in a CMD, Bash or Powershell window. To do this, go to a folder on your computer, click in the folder path at the top and type CMD, then press enter._
+
+1. create conda virtual environment 
+   
+```
+conda create -n gempytf_env python=3
+```
+
+2. activate the virtual environment 
+   
+```
+conda activate gempytf_env
+```
+
+3.  Clone the repository: For this step you need Git installed, but you can just download the zip file instead by clicking the button at the top of this page
+   
+```
+https://github.com/GeorgeLiang3/GemPyTF.git
+```
+
+4. Navigate to the project directory: (Type this into your CMD window, you're aiming to navigate the CMD window to the repository you just downloaded)
+
+```
+cd GemPyTF
+```
+
+5. Install the required dependencies: (Again, type this into your CMD window)
+
+```
+pip install -r requirements.txt
+```
 
 ## Limitations
 At the moment there are only limited models are tested (in [Examples](/Examples/)). 
