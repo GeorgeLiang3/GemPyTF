@@ -14,7 +14,7 @@ _The following commands should be executed in a CMD, Bash or Powershell window. 
 1. create conda virtual environment 
    
 ```
-conda create -n gempytf_env python=3
+conda create -n gempytf_env python=3.7
 ```
 
 2. activate the virtual environment 
