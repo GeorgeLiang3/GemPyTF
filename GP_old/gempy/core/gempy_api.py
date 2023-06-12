@@ -61,6 +61,9 @@ def set_series(geo_model: Model, mapping_object: Union[dict, pn.Categorical] = N
 
     map_series_to_surfaces(geo_model, mapping_object, set_series, sort_data)
 
+## George ##
+def assign_global_anisotropy(geo_model, mapping_object):
+    geo_model.assign_global_anisotropy(mapping_object)
 
 @setdoc(Model.map_series_to_surfaces.__doc__)
 def map_series_to_surfaces(geo_model: Model, mapping_object: Union[dict, pn.Categorical] = None,

@@ -50,6 +50,13 @@ class ModelTF(DataMutation):
         self.orientations = self.geo_data.orientations
         self._orientations = self.geo_data.orientations
         self.centers = self.geo_data.rescaling.df.loc['values', 'centers'].astype(self.dtype)
+        
+        if 'anisotropy' in self.geo_data.series.df.columns:
+            self.anisotropy_vector = np.stack(self.geo_data.series.df['anisotropy'].values, axis = 0)
+        else:
+            num_series = len(self.geo_data.series.df)
+            self.anisotropy_vector = np.ones((num_series, 3))
+        self.anisotropy_vector = tf.constant(self.anisotropy_vector, dtype = self.dtype)
 
         # g = GravityPreprocessing(self.geo_data.grid.centered_grid)
 
@@ -359,13 +366,14 @@ class ModelTF(DataMutation):
                 mask_matrix,
                 block_matrix]
     
-    def create_tensorflow_graph(self, input, delta = 100000, gradient = False,compute_gravity = False,matrix_size = None,max_slope = None):
+    def create_tensorflow_graph(self, delta = 100000, gradient = False,compute_gravity = False,matrix_size = None,max_slope = None):
         '''
             'matrix_size': specify the operating matrix size, if None, the Tensorflow will infer the size dynamically
             'delta': controls the magnitude of the slope, [-inf,inf] -> [0,max_slope]
             'max_slope': Maximum slope to allow the gradient to be kept during the learning  
         '''
-        self.TFG = TFGraph(input, self.fault_drift,
+        gpinput = self.get_graph_input()
+        self.TFG = TFGraph(gpinput, self.fault_drift,
                 self.grid_tensor, self.values_properties, self.nugget_effect_grad,self.nugget_effect_scalar, self.Range,
                 self.C_o, self.rescale_factor,delta_slope = delta, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity,
                 matrix_size = matrix_size,max_slope = max_slope)
@@ -401,7 +409,8 @@ class ModelTF(DataMutation):
                     self.dips_position,
                     dip_angles,
                     self.azimuth,
-                    self.polarity,)
+                    self.polarity,
+                    anisotropy_vec = self.anisotropy_vector)
         
         self.grid = self._grid
         size = tf.reduce_prod(self.resolution_,name = 'reduce_prod_size_')
@@ -429,7 +438,8 @@ class ModelTF(DataMutation):
                         dip_angles,
                         self.azimuth,
                         self.polarity,
-                        values_properties = values_properties)
+                        values_properties = values_properties,
+                        anisotropy_vec = self.anisotropy_vector)
 
             # densities = final_property[0:size] # slice the density by resolution
             densities = tf.strided_slice(final_property,[0],[size],[1],name = 'ss_w_den_') # This fix the 'Const_4' int64_val : 1 when print the graph
@@ -467,7 +477,8 @@ class ModelTF(DataMutation):
                             dip_angles,
                             self.azimuth,
                             self.polarity,
-                            values_properties = values_properties)
+                            values_properties = values_properties,
+                            anisotropy_vec = self.anisotropy_vector)
                 size = kernel.values.shape[0]
                 densities = final_property[:size]
 
@@ -480,7 +491,8 @@ class ModelTF(DataMutation):
                             self.dips_position,
                             dip_angles,
                             self.azimuth,
-                            self.polarity,)
+                            self.polarity,
+                            anisotropy_vec = self.anisotropy_vector)
                     size = tz.shape[0]
                     windowed_densities = final_property[i*size:(i+1)*size]
                     grav_ = self.TFG.compute_forward_gravity(tz, 0, size, windowed_densities)

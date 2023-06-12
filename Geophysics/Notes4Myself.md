@@ -1,0 +1,1 @@
+since mid 2022 after the first publication, the work is moved to the newer version of GempyTensorflow from github

@@ -536,6 +536,17 @@ class DataMutation(object):
     def set_surface_values(self, values_array: Union[np.ndarray, list], properties_names: list = np.empty(0)):
         self.surfaces.set_surfaces_values(values_array, properties_names)
         return self.surfaces
+    
+    ## George
+    def assign_global_anisotropy(self,mapping_object):
+
+        if type(mapping_object) is dict:
+            anisotropy_df = pn.DataFrame(index=mapping_object.keys(), columns=['anisotropy'])
+            for index in anisotropy_df.index:
+                anisotropy_df.at[index, 'anisotropy'] = mapping_object[index]
+
+            self.series.df = pn.merge(self.series.df, anisotropy_df, left_index=True, right_index=True)
+        
 
     @setdoc([Surfaces.map_series.__doc__], indent=False)
     def map_series_to_surfaces(self, mapping_object: Union[dict, pn.Categorical] = None,

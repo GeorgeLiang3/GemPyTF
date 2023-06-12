@@ -27,8 +27,8 @@ geo_data.set_is_fault(['Fault_Series'])
 
 model = ModelTF(geo_data)
 model.activate_regular_grid()
-gpinput = model.get_graph_input()
-model.create_tensorflow_graph(gpinput,gradient = False)
+
+model.create_tensorflow_graph(gradient = False)
 
 
 # %%
