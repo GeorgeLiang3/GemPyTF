@@ -1,7 +1,8 @@
 import numpy as np
 from gempy.core.data import SurfacePoints, Orientations, Grid, Surfaces, Series, Faults, AdditionalData
 import tensorflow as tf
-from gempy.core.tensor.tensorflow_graph_uncon_sig_fault_var import TFGraph
+#from gempy.core.tensor.tensorflow_graph_uncon_sig_fault_var import TFGraph
+from gempy.core.tensor.tensorflow_graph_uncon_sig_fault_var_Deep import TFGraph
 from gempy.core.solution import Solution
 from gempy.core.model import DataMutation
 from gempy.assets.geophysics import *
@@ -9,17 +10,13 @@ from gempy.core.grid_modules.grid_types import CenteredRegGrid
 import copy
 
 class ModelTF(DataMutation):
-    def __init__(self,geo_data,dtype ='float64') -> None:
+    def __init__(self,geo_data) -> None:
         super().__init__()
         # geo_data.surfaces.df.sort_values(by=['order_surfaces'], inplace=True, ascending=False)
         # geo_data.surfaces.update_id()
-
         self.geo_data = geo_data
-        if dtype == 'float64':
-            self.tfdtype = tf.float64
-        elif dtype == 'float32':
-            self.tfdtype = tf.float32
-        self.dtype = dtype
+        self.tfdtype = tf.float64
+        self.dtype = 'float64'
         self.from_gempy_interpolator()
     def from_gempy_interpolator(self):
         self.interpolator = self.geo_data.interpolator
@@ -50,13 +47,6 @@ class ModelTF(DataMutation):
         self.orientations = self.geo_data.orientations
         self._orientations = self.geo_data.orientations
         self.centers = self.geo_data.rescaling.df.loc['values', 'centers'].astype(self.dtype)
-        
-        if 'anisotropy' in self.geo_data.series.df.columns:
-            self.anisotropy_vector = np.stack(self.geo_data.series.df['anisotropy'].values, axis = 0)
-        else:
-            num_series = len(self.geo_data.series.df)
-            self.anisotropy_vector = np.ones((num_series, 3))
-        self.anisotropy_vector = tf.constant(self.anisotropy_vector, dtype = self.dtype)
 
         # g = GravityPreprocessing(self.geo_data.grid.centered_grid)
 
@@ -366,21 +356,19 @@ class ModelTF(DataMutation):
                 mask_matrix,
                 block_matrix]
     
-    def create_tensorflow_graph(self, delta = 2., gradient = False,compute_gravity = False,matrix_size = None,max_slope = None):
+    def create_tensorflow_graph(self, delta = 100000, Transformation_matrix =tf.eye(3), gradient = False,compute_gravity = False,matrix_size = None,max_slope = None):
         '''
             'matrix_size': specify the operating matrix size, if None, the Tensorflow will infer the size dynamically
-            'delta': defines the sigmoid function shape, default value 2 is recommended.
-            'max_slope': Scale the sigmoid function w.r.t grid size. Example for calculating max_slope: 
-            #max_length = np.sqrt(Reg_kernel.dxyz[0]**2 + Reg_kernel.dxyz[1]**2 + Reg_kernel.dxyz[2]**2)
-            #max_slope = 1.5*2/max_length * model.rf
+            'delta': controls the magnitude of the slope, [-inf,inf] -> [0,max_slope]
+            'max_slope': Maximum slope to allow the gradient to be kept during the learning  
         '''
         gpinput = self.get_graph_input()
         self.TFG = TFGraph(gpinput, self.fault_drift,
                 self.grid_tensor, self.values_properties, self.nugget_effect_grad,self.nugget_effect_scalar, self.Range,
-                self.C_o, self.rescale_factor,delta_slope = delta, dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity,
+                self.C_o, self.rescale_factor,delta_slope = delta,Transformation_matrix = Transformation_matrix,  dtype = self.tfdtype, gradient = gradient,compute_gravity = compute_gravity,
                 matrix_size = matrix_size,max_slope = max_slope)
     
-
+    # def calculate_grav(self,surface_coord, values_properties):
     
     def prepare_input(self,gradient = False,surface_points = None):
         # self.activate_regular_grid()
@@ -411,8 +399,8 @@ class ModelTF(DataMutation):
                     self.dips_position,
                     dip_angles,
                     self.azimuth,
-                    self.polarity,
-                    anisotropy_vec = self.anisotropy_vector)
+                    self.polarity,)
+        
         
         self.grid = self._grid
         size = tf.reduce_prod(self.resolution_,name = 'reduce_prod_size_')
@@ -440,8 +428,7 @@ class ModelTF(DataMutation):
                         dip_angles,
                         self.azimuth,
                         self.polarity,
-                        values_properties = values_properties,
-                        anisotropy_vec = self.anisotropy_vector)
+                        values_properties = values_properties)
 
             # densities = final_property[0:size] # slice the density by resolution
             densities = tf.strided_slice(final_property,[0],[size],[1],name = 'ss_w_den_') # This fix the 'Const_4' int64_val : 1 when print the graph
@@ -472,7 +459,6 @@ class ModelTF(DataMutation):
 
         if method == 'kernel_reg':
             # The performance in backpropogation differs a lot with vectorized and iterative computation. Here the iterative computation is used to generate High resolution data in CPU. 
-
             if LOOP_FLAG == False:
                 # Vectorized computation
                 final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
@@ -480,11 +466,9 @@ class ModelTF(DataMutation):
                             dip_angles,
                             self.azimuth,
                             self.polarity,
-                            values_properties = values_properties,
-                            anisotropy_vec = self.anisotropy_vector)
+                            values_properties = values_properties)
                 size = kernel.values.shape[0]
                 densities = final_property[:size]
-
 
                 grav = self.TFG.compute_forward_gravity(tz, 0, size, densities)
             else:
@@ -495,8 +479,7 @@ class ModelTF(DataMutation):
                             self.dips_position,
                             dip_angles,
                             self.azimuth,
-                            self.polarity,
-                            anisotropy_vec = self.anisotropy_vector)
+                            self.polarity,)
                     size = tz.shape[0]
                     windowed_densities = final_property[i*size:(i+1)*size]
                     grav_ = self.TFG.compute_forward_gravity(tz, 0, size, windowed_densities)

@@ -1,5 +1,6 @@
 import tensorflow as tf  # tensorflow_nightly
 # import numpy as np
+from tensorflow.python.ops.numpy_ops import np_config
 import sys
 
 '''
@@ -11,9 +12,9 @@ class TFGraph(tf.Module):
 
     def __init__(self, input,
                  fault_drift, grid, values_properties,nugget_effect_grad,nugget_effect_scalar,
-                Range, C_o, rescalefactor,delta_slope=50, output=None,sigmoid=False,compute_gravity = False,matrix_size = None, **kwargs):
+                Range, C_o, rescalefactor,delta_slope=50,Transformation_matrix =tf.eye(3), output=None,sigmoid=False,compute_gravity = False,matrix_size = None, **kwargs):
         super(TFGraph, self).__init__()
-        
+
         (self.number_of_points_per_surface_T,
         self.npf,
         self.len_series_i,
@@ -34,8 +35,7 @@ class TFGraph(tf.Module):
         self.compute_gravity_flag = compute_gravity
         self.dtype = kwargs.get('dtype', tf.float32)
         self.lengh_of_faults = tf.constant(0, dtype=tf.int32)
-
-    
+        self.Transformation_matrix = tf.cast(Transformation_matrix, dtype=self.dtype)
 
         # OPETIONS
         # -------
@@ -61,7 +61,7 @@ class TFGraph(tf.Module):
         self.i_rescale = tf.constant(4., dtype=self.dtype)
         self.gi_rescale = tf.constant(2., dtype=self.dtype)
 
-        # Number of dimensions. Now it is not too variable anymore
+        # Number of dimensions. Now it is not 2 variable anymore
         self.n_dimensions = 3
 
         # self.number_of_points_per_surface = tf.cast(
@@ -85,6 +85,7 @@ class TFGraph(tf.Module):
             self.delta_slope = tf.Variable(delta_slope,dtype = self.dtype,name = 'delta_slope')
             
         else:
+ 
             self.delta_slope = tf.constant(delta_slope,dtype = self.dtype,name = 'delta_slope')
 
 
@@ -129,6 +130,8 @@ class TFGraph(tf.Module):
         # self.is_onlap =tf.constant([0,1])
         # self.n_surfaces_per_series = tf.constant([3,3])
         # self.n_universal_eq_T = tf.constant([3,3])
+
+    
     
     def update_property(self):
         if self.value_properties.shape[0] > 1:
@@ -162,28 +165,38 @@ class TFGraph(tf.Module):
 
     
     #@tf.function
-    def euclidean_distance(self, x_1, x_2, anisotropy_vector):
+    def squared_euclidean_distance(self, x_1, x_2):
         """
         Compute the euclidian distances in 3D between all the points in x_1 and x_2
 
         Arguments:
             x_1 {[Tensor]} -- shape n_points x number dimension
             x_2 {[Tensor]} -- shape n_points x number dimension
-            anisotropy_vector -- Global anisotropy
 
         Returns:
             [Tensor] -- Distancse matrix. shape n_points x n_points
         """
-
-        x_1 = x_1*anisotropy_vector
-        x_2 = x_2*anisotropy_vector
-
         # tf.maximum avoid negative numbers increasing stability
-        euclidean_d = tf.sqrt(tf.maximum(tf.reshape(tf.reduce_sum(x_1**2, 1), shape=(tf.shape(x_1)[0], 1)) +
-                                 tf.reshape(tf.reduce_sum(x_2**2, 1), shape=(1, tf.shape(x_2)[0])) -
-                                 2 * tf.tensordot(x_1, tf.transpose(x_2), 1), tf.constant(1e-12, dtype=self.dtype)))
+        x_1 = tf.cast(x_1, dtype= self.dtype)
+        x_2 = tf.cast(x_2, dtype= self.dtype)
+        #Transformation_matrix = tf.cast(Transformation_matrix, dtype= self.dtype)
+        #print(" Inside SED", self.Transformation_matrix)
+        if (x_1.shape[1] == self.Transformation_matrix.shape[1]) or (x_2.shape[1] == self.Transformation_matrix.shape[1]):
+            
+            x_1 = x_1 @ tf.transpose(self.Transformation_matrix)
+            x_2 = x_2 @ tf.transpose(self.Transformation_matrix)
+            sqd = tf.sqrt(tf.maximum(tf.reshape(tf.reduce_sum(x_1**2, 1), shape=(tf.shape(x_1)[0], 1)) +
+                                    tf.reshape(tf.reduce_sum(x_2**2, 1), shape=(1, tf.shape(x_2)[0])) -
+                                    2 * tf.tensordot(x_1, tf.transpose(x_2), 1), tf.constant(1e-12, dtype=self.dtype)))
 
-        return euclidean_d
+            return sqd
+        else:
+            print("Transformation matrix is not compatible with Input dimensions. Therefor anisotropy is not applied")
+            sqd = tf.sqrt(tf.maximum(tf.reshape(tf.reduce_sum(x_1**2, 1), shape=(tf.shape(x_1)[0], 1)) +
+                                    tf.reshape(tf.reduce_sum(x_2**2, 1), shape=(1, tf.shape(x_2)[0])) -
+                                    2 * tf.tensordot(x_1, tf.transpose(x_2), 1), tf.constant(1e-12, dtype=self.dtype)))
+
+            return sqd
 
     #@tf.function
     def matrices_shapes(self):
@@ -203,16 +216,16 @@ class TFGraph(tf.Module):
         return length_of_CG, length_of_CGI, length_of_U_I, length_of_faults, length_of_C
 
     #@tf.function
-    def cov_surface_points(self, ref_layer_points, rest_layer_points,anisotropy_vector):
+    def cov_surface_points(self, ref_layer_points, rest_layer_points):
 
-        sed_rest_rest = self.euclidean_distance(
-            rest_layer_points, rest_layer_points,anisotropy_vector)
-        sed_ref_rest = self.euclidean_distance(
-            ref_layer_points, rest_layer_points,anisotropy_vector)
-        sed_rest_ref = self.euclidean_distance(
-            rest_layer_points, ref_layer_points,anisotropy_vector)
-        sed_ref_ref = self.euclidean_distance(
-            ref_layer_points, ref_layer_points,anisotropy_vector)
+        sed_rest_rest = self.squared_euclidean_distance(
+            rest_layer_points, rest_layer_points)
+        sed_ref_rest = self.squared_euclidean_distance(
+            ref_layer_points, rest_layer_points)
+        sed_rest_ref = self.squared_euclidean_distance(
+            rest_layer_points, ref_layer_points)
+        sed_ref_ref = self.squared_euclidean_distance(
+            ref_layer_points, ref_layer_points)
 
         C_I = self.c_o_T * self.i_rescale * (
             tf.where(sed_rest_rest < self.a_T, x=(1 - 7 * (sed_rest_rest / self.a_T) ** 2 +
@@ -235,22 +248,240 @@ class TFGraph(tf.Module):
         C_I = C_I + tf.eye(tf.shape(C_I)[0], dtype=self.dtype) * \
             self.nugget_effect_scalar_T_op
         return C_I
+    #####################################################################################################
+    #                       Introducing the Modified covaraince matrix and functions
+    #####################################################################################################
+    def covariance_function(self, r):
+        r_by_at = r/self.a_T
+        C_r = tf.where(r < self.a_T, x=(self.c_o_T *( 1 - 7 * (r_by_at)**2 + 8.75 * (r_by_at)**3 - 3.5 * (r_by_at)**5 + 0.75 * (r_by_at)**7)), y=0.)
+        return C_r
+    def first_derivative_covariance_function(self, r):
+        C_r_dash =tf.where(r < self.a_T, x=(self.c_o_T *( - 14 * (r/self.a_T**2) + 105/4 * (r**2/self.a_T**3) - 35/2 * (r**4/self.a_T**5) + 21/4 * (r**6/self.a_T**7))), y=0.)
+        return C_r_dash
+    def first_derivative_covariance_function_divided_by_r(self, r):
+        C_r_dash_by_r = tf.where(r< self.a_T, x =(self.c_o_T *( - 14 / ((self.a_T)**2) + 105/4 * (r/(self.a_T)**3) - 35/2 * (r**3/(self.a_T)**5) + 21/4 * (r**5/(self.a_T)**7))), y=0.)
+        return C_r_dash_by_r
+    def second_derivative_covariance_function(self,r):
+        C_r_dash_dash =tf.where(r < self.a_T, x=(self.c_o_T * 7 * (9 * r ** 5 - 20 * self.a_T ** 2 * r ** 3 + 15 * self.a_T ** 4 * r - 4 * self.a_T ** 5) / (2 * self.a_T ** 7)), y=0.)
+        return C_r_dash_dash
+    
+    ## Cartesian distance between dips and dips points
 
+    def cartesian_dist_hu(self, x1, x2):
+        #print("I am inside cartesian_dist_hu")
+        x1 = x1@ tf.transpose(self.Transformation_matrix)
+        x2 = x2@ tf.transpose(self.Transformation_matrix)
+        k = x1.shape[1]
+        H =[]
+        dummy_H=[]
+        #print(x1, x2)
+        # We converted x' = x A . 
+        # There for delta x' = h_u (old) = delta x A
+        for i in range(k):
+            delta_x_i = x1[:,i] - tf.reshape(x2[:,i], shape=(x2.shape[0],1))
+            H.append(delta_x_i)
+        
+        #print("T_Matrix \n ", Transformation_matrix)
+        #print("k :", k)
+        for i in range(k):
+            a=tf.zeros(H[i].shape, dtype=self.dtype)
+            
+            for j in range(k):
+                a= a + H[j]* self.Transformation_matrix[j,i]
+                
+            dummy_H.append(a)
+        
+        H = dummy_H
+        
+        return H
+    
+    ## Cartesian distance between dips and interface points
+
+    def cartesian_dist_no_tile(self, x_1,x_2):
+        x_1 = x_1 @ tf.transpose(self.Transformation_matrix)
+        x_2 = x_2 @ tf.transpose(self.Transformation_matrix)
+        k = x_1[0].shape[0]
+        H_I = []
+        Dummy_H_I = []
+        for i in range(k):
+            H_I.append(tf.transpose((x_1[:,i] - tf.reshape(x_2[:,i],[x_2.shape[0],1]))))
+        #H_I = tf.concat(H_I,axis=0)
+        #print("input data",x_1.shape,x_2.shape)
+        #print("print H_I",H_I)
+        # return np.concatenate([
+        #     np.transpose((x_1[:,0] - np.reshape(x_2[:,0],[x_2.shape[0],1]))),
+        #     np.transpose((x_1[:,1] - np.reshape(x_2[:,1],[x_2.shape[0],1])))],axis = 0) 
+        
+        for i in range(k):
+            a=tf.zeros(H_I[i].shape, dtype=self.dtype)
+            for j in range(k):
+                a= a + H_I[j]* self.Transformation_matrix[j,i]
+            Dummy_H_I.append(a)
+            #H_I[i]=a
+        #H_I = Dummy_H_I
+        H_I = tf.concat(Dummy_H_I,axis=0)
+
+        #print("H_I\n", H_I)
+        return H_I
+
+
+    def cov_gradients2(self, dips_position):
+        #print("Inside gradient 2 dips_position/n", dips_position)
+        #print("dimension :", self.n_dimensions)
+        dips_position_tiled = tf.tile(
+            dips_position, [self.n_dimensions, 1])
+        #print("dips_position_tiled :\n", dips_position_tiled)
+        dist_tiled = self.squared_euclidean_distance(dips_position_tiled, dips_position_tiled)
+        #print("dist_tiled is calculated \n", dist_tiled )
+        #dist_tiled = dist_tiled + tf.ones(dist_tiled.shape[0])
+        
+        H = self.cartesian_dist_hu(dips_position_tiled, dips_position_tiled)
+        
+
+        k = len(H) # component of gradient available
+        n = int(H[0].shape[0]/ k) # number of place where gradient is defined
+        #print("  number of data points" , n)
+        #################################################################################################
+        # For cross term of gradient 
+        #################################################################################################
+        # if we have many component of Gradient, we can club it to make , H =[h_u, h_v, h_w,....] 
+        #H =[h_u, h_v] 
+        #C_G = (tf.zeros([n*k, n*k], dtype=self.dtype))
+        C_G_full = []
+        #print("C_G \n", C_G)
+        for i in range(k):
+            C_G_block = []
+            for j in range(k):
+                #print(" Hi I am inside the loop begin", i , j )
+                hu_hv = H[i][n*i:n*(i+1), n*j:n*(j+1)] * H[j][n*i:n*(i+1), n*j:n*(j+1)]
+                # print( " position in the block \n", i,j)
+                # print("hu_hv Deep \n", hu_hv)
+                dist =dist_tiled[n*i:n*(i+1), n*j:n*(j+1)]
+                dist_sqr = dist **2 
+                #print(dist)
+                hu_hv_by_dist_sqr =  tf.math.divide_no_nan(hu_hv, dist_sqr)
+            
+                #print(" Hi I am inside the loop", i , j )
+                # Cross gradient term for C_ZuZv
+                if i != j:
+                    #print("cross terms")
+                    #t2 = - C'_z(r)/r + C''_z(r) 
+                    # t2 = -c_o_T*((-14/a_T**2)+
+                    #             105/4*dist/a_T**3 -
+                    #             35/2 * dist**3 / a_T **5 +
+                    #             21 /4 * dist**5/a_T**7)+\
+                    #     c_o_T * 7 * (9 * dist ** 5 -
+                    #                 20 * a_T ** 2 * dist ** 3 +
+                    #                 15 * a_T ** 4 * dist -
+                    #                 4 * a_T ** 5) / (2 * a_T ** 7)
+                    t2 = - self.first_derivative_covariance_function_divided_by_r(dist) + self.second_derivative_covariance_function(dist)
+                    anisotrop_term = self.first_derivative_covariance_function_divided_by_r(dist) * tf.reduce_sum(self.Transformation_matrix[:,i]*self.Transformation_matrix[:,j])
+                    #C_G[n*i:n*(i+1), n*j:n*(j+1)]= hu_hv_by_dist_sqr * t2 + anisotrop_term
+                    #print("terms off diag ", hu_hv_by_dist_sqr * t2 + anisotrop_term)
+                    #################### Added - in front of cross term to make it compatible with miguel ########################
+                    C_G_block.append(-(hu_hv_by_dist_sqr * t2 + anisotrop_term))
+                    
+                # Gradient for similar type of gradient
+                else:
+                    #print("diagonal_bloc")
+                    dist_cube = dist **3
+                    hu_hv_by_dist_cube = tf.math.divide_no_nan(hu_hv, dist_cube)
+                    # C'_z(r)
+                    # t4 = c_o_T*((-14 *dist/a_T**2)+
+                    #             105/4*dist**2/a_T**3 -
+                    #             35/2 * dist**4 / a_T **5 +
+                    #             21 /4 * dist**6/a_T**7)
+                    t4 = self.first_derivative_covariance_function(dist)
+                    #print("C'_z(r)\n", t4)
+                    # C'_z(r)/r
+                    # t5 = c_o_T*((-14/a_T**2)+
+                    #             105/4*dist/a_T**3 -
+                    #             35/2 * dist**3 / a_T **5 +
+                    #             21 /4 * dist**5/a_T**7)
+                    # Here we have added the last term for anisotropy effect
+                    t5 = self.first_derivative_covariance_function_divided_by_r(dist) * tf.reduce_sum((self.Transformation_matrix[:,i])**2)
+                    #print("C'_z(r)/r\n", t5)
+                    # C''_z(r)
+
+                    # t6 = c_o_T * 7 * (9 * dist ** 5 -
+                    #                 20 * a_T ** 2 * dist ** 3 +
+                    #                 15 * a_T ** 4 * dist -
+                    #                 4 * a_T ** 5) / (2 * a_T ** 7)
+                    t6 = self.second_derivative_covariance_function(dist)
+                    #print("C''_z(r)\n", t6)
+                    ################################# Note ############################################
+                    # Covariance of gradient is negative for points closer to zero
+                    ##################################################################################
+                    #C_G[n*i:n*(i+1), n*j:n*(j+1)] = - t4 * hu_hv_by_dist_cube + t5 + hu_hv_by_dist_sqr * t6
+                    #C_G[n*i:n*(i+1), n*j:n*(j+1)]= - t4 * hu_hv_by_dist_cube - t5 + hu_hv_by_dist_sqr * t6
+                    # print("(hu_hv/ r^2)(C''(z) - C'(z)/r) Deep \n", hu_hv_by_dist_sqr * (t6 - t5) )
+                    # print(" C'(z)/r Deep \n" , t5)
+                    # print("terms diag Deep \n" ,- t4 * hu_hv_by_dist_cube + t5 + hu_hv_by_dist_sqr * t6 )
+
+                    #################### Added - in front of cross term to make it compatible with miguel ########################
+                    C_G_block.append( -(- t4 * hu_hv_by_dist_cube + t5 + hu_hv_by_dist_sqr * t6))
+            C_G_full.append(tf.concat(C_G_block, axis=1))
+        C_G = tf.concat(C_G_full, axis=0)
+        #print( "Shape of C_G", C_G.shape)
+        
+        # If the distance is greater than a, then function C_z(r) = 0 . 
+        # Therefore, we can replace the element of covariance matrix with 0 for distance greater than a
+        condition = tf.less_equal(dist_tiled, self.a_T)
+        # print("dist \n", dist_tiled)
+        # print("condition\n", condition)
+        # print("C_G \n" ,C_G) 
+        C_G = tf.where(condition, C_G, 0)
+        #C_G[dist_tiled>self.a_T] = 0
+        #print("C_G \n" ,C_G) 
+        #print("negget \n", self.nugget_effect_grad_T_op)
+        #C_G = C_G +  tf.eye(n*k) * self.nugget_effect_grad_T_op
+        C_G = C_G + tf.eye(tf.shape(C_G)[0],
+                           dtype=self.dtype) * self.nugget_effect_grad_T_op
+        #print("C_G \n" ,C_G) 
+        return C_G
+
+    def cov_interface_gradients2(self, dips_position_all, rest_layer_points, ref_layer_points):
+        dips_position_all_tiled = tf.tile(
+            dips_position_all, [self.n_dimensions, 1])
+        #print("dips_position_all_tiled", dips_position_all_tiled)
+        hu_rest = self.cartesian_dist_no_tile(dips_position_all,rest_layer_points)
+        #print(hu_rest)
+        hu_ref = self.cartesian_dist_no_tile(dips_position_all,ref_layer_points)
+        
+        sed_dips_rest = self.squared_euclidean_distance(dips_position_all_tiled,rest_layer_points)
+        sed_dips_ref = self.squared_euclidean_distance(dips_position_all_tiled,ref_layer_points)
+        #print(hu_rest.shape,"\n",  hu_ref.shape, "\n",sed_dips_rest.shape,"\n", sed_dips_ref.shape)
+        # C_GI = (hu_rest*(- c_o_T * ((-14 / a_T ** 2) + 105 / 4 * sed_dips_rest / a_T ** 3 -
+        #                               35 / 2 * sed_dips_rest ** 3 / a_T ** 5 +
+        #                               21 / 4 * sed_dips_rest ** 5 / a_T ** 7))-\
+        # hu_ref*(-c_o_T * ((-14 / a_T ** 2) + 105 / 4 * sed_dips_ref / a_T ** 3 -
+        #                               35 / 2 * sed_dips_ref ** 3 / a_T ** 5 +
+        #                               21 / 4 * sed_dips_ref ** 5 / a_T ** 7)))
+        #print("self.gi_rescale\n", self.gi_rescale)
+        C_GI = self.gi_rescale * tf.transpose(- hu_rest * self.first_derivative_covariance_function_divided_by_r(sed_dips_rest) + hu_ref* self.first_derivative_covariance_function_divided_by_r(sed_dips_ref))
+        #C_GI = - hu_rest * first_derivative_covariance_function_divided_by_r2(sed_dips_rest) + hu_ref* first_derivative_covariance_function_divided_by_r2(sed_dips_ref)
+        return C_GI
+
+    #####################################################################################################
+    # End of modification                       
+    #####################################################################################################
     #@tf.function
-    def cov_gradients(self, dips_position,anisotropy_vector):
+    def cov_gradients(self, dips_position):
         dips_position_tiled = tf.tile(
             dips_position, [self.n_dimensions, 1])
 
-        sed_dips_dips = self.euclidean_distance(
-            dips_position_tiled, dips_position_tiled,anisotropy_vector)
+        sed_dips_dips = self.squared_euclidean_distance(
+            dips_position_tiled, dips_position_tiled)
 
+        # How to create H matrix?
+        # Here it is written like h_u = [[h_x, h_x, h_x],[h_y, h_y, h_y],[h_z, h_z, h_z]]
         h_u = tf.concat([
-            anisotropy_vector[0]*tf.tile(dips_position[:, 0] - tf.reshape(
+            tf.tile(dips_position[:, 0] - tf.reshape(
                 dips_position[:, 0], [tf.shape(dips_position)[0], 1]), [1, 3]),
-            anisotropy_vector[1]*tf.tile(dips_position[:, 1] - tf.reshape(
+            tf.tile(dips_position[:, 1] - tf.reshape(
                 dips_position[:, 1], [tf.shape(dips_position)[0], 1]), [1, 3]),
-            anisotropy_vector[2]*tf.tile(dips_position[:, 2] - tf.reshape(dips_position[:, 2], [tf.shape(dips_position)[0], 1]), [1, 3])], axis=0)
-
+            tf.tile(dips_position[:, 2] - tf.reshape(dips_position[:, 2], [tf.shape(dips_position)[0], 1]), [1, 3])], axis=0)
+        
         h_v = tf.transpose(h_u)
 
         sub_x = tf.concat([tf.ones([tf.shape(dips_position)[0], tf.shape(dips_position)[0]]), tf.zeros(
@@ -260,9 +491,12 @@ class TFGraph(tf.Module):
             [tf.shape(dips_position)[0], 1 * tf.shape(dips_position)[0]])], axis=1), tf.zeros([tf.shape(dips_position)[0], tf.shape(dips_position)[0]])], 1)
         sub_z = tf.concat([tf.zeros([tf.shape(dips_position)[0], 2 * tf.shape(dips_position)[0]]),
                            tf.ones([tf.shape(dips_position)[0], tf.shape(dips_position)[0]])], axis=1)
-
+        # Sub matrix is arrange in a way in perpedicularity matrix such that
+        # perpendicularity_matrix = [[I, O ,O], [O, I ,O],[O, O ,I]]
         perpendicularity_matrix = tf.cast(
             tf.concat([sub_x, sub_y, sub_z], axis=0), dtype=self.dtype,name = 'cast_pm')
+
+        #print(" hu * hv Mig\n" , h_u * h_v)
 
         condistion_fail = tf.math.divide_no_nan(h_u * h_v, sed_dips_dips ** 2) * (
             tf.where(sed_dips_dips < self.a_T,
@@ -274,7 +508,16 @@ class TFGraph(tf.Module):
             perpendicularity_matrix * tf.where(sed_dips_dips < self.a_T, x=self.c_o_T * ((-14. / self.a_T ** 2.) + 105. / 4. * sed_dips_dips / self.a_T ** 3. -
                                                                                          35. / 2. * sed_dips_dips ** 3. / self.a_T ** 5. +
                                                                                          21. / 4. * sed_dips_dips ** 5. / self.a_T ** 7.), y=0.)
-
+        # print(" hu_hv / r^2 * ( C''(Z) - C'(Z)/r) Miguel \n", tf.math.divide_no_nan(h_u * h_v, sed_dips_dips ** 2) * (
+        #     tf.where(sed_dips_dips < self.a_T,
+        #              x=(((-self.c_o_T * ((-14. / self.a_T ** 2.) + 105. / 4. * sed_dips_dips / self.a_T ** 3. -
+        #                                  35. / 2. * sed_dips_dips ** 3. / self.a_T ** 5. +
+        #                                  21. / 4. * sed_dips_dips ** 5. / self.a_T ** 7.))) +
+        #                 self.c_o_T * 7. * (9. * sed_dips_dips ** 5. - 20. * self.a_T ** 2. * sed_dips_dips ** 3. +
+        #                                    15. * self.a_T ** 4. * sed_dips_dips - 4. * self.a_T ** 5.) / (2. * self.a_T ** 7.)), y=0.)) )
+        # print(" C'(Z)/r Miguel \n", perpendicularity_matrix * tf.where(sed_dips_dips < self.a_T, x=self.c_o_T * ((-14. / self.a_T ** 2.) + 105. / 4. * sed_dips_dips / self.a_T ** 3. -
+        #                                                                                  35. / 2. * sed_dips_dips ** 3. / self.a_T ** 5. +
+        #                                                                                  21. / 4. * sed_dips_dips ** 5. / self.a_T ** 7.), y=0.))
         C_G = tf.where(sed_dips_dips == 0, x=tf.constant(
             0., dtype=self.dtype), y=condistion_fail)
         C_G = C_G + tf.eye(tf.shape(C_G)[0],
@@ -283,29 +526,29 @@ class TFGraph(tf.Module):
         return C_G
 
     #@tf.function
-    def cartesian_dist(self, x_1, x_2,anisotropy_vector):
+    def cartesian_dist(self, x_1, x_2):
         return tf.concat([
-            anisotropy_vector[0]*tf.transpose(
+            tf.transpose(
                 (x_1[:, 0] - tf.expand_dims(x_2[:, 0], axis=1))),
-            anisotropy_vector[1]*tf.transpose(
+            tf.transpose(
                 (x_1[:, 1] - tf.expand_dims(x_2[:, 1], axis=1))),
-            anisotropy_vector[2]*tf.transpose(
+            tf.transpose(
                 (x_1[:, 2] - tf.expand_dims(x_2[:, 2], axis=1)))], axis=0)
 
     #@tf.function
-    def cov_interface_gradients(self, dips_position_all, rest_layer_points, ref_layer_points,anisotropy_vector):
+    def cov_interface_gradients(self, dips_position_all, rest_layer_points, ref_layer_points):
         dips_position_all_tiled = tf.tile(
             dips_position_all, [self.n_dimensions, 1])
 
-        sed_dips_rest = self.euclidean_distance(
-            dips_position_all_tiled, rest_layer_points,anisotropy_vector)
-        sed_dips_ref = self.euclidean_distance(
-            dips_position_all_tiled, ref_layer_points,anisotropy_vector)
+        sed_dips_rest = self.squared_euclidean_distance(
+            dips_position_all_tiled, rest_layer_points)
+        sed_dips_ref = self.squared_euclidean_distance(
+            dips_position_all_tiled, ref_layer_points)
 
         hu_rest = self.cartesian_dist(
-            dips_position_all, rest_layer_points,anisotropy_vector)
+            dips_position_all, rest_layer_points)
         hu_ref = self.cartesian_dist(
-            dips_position_all, ref_layer_points,anisotropy_vector)
+            dips_position_all, ref_layer_points)
 
         C_GI = self.gi_rescale * tf.transpose(hu_rest *
                                                tf.where(sed_dips_rest < self.a_T_surface, x=(- self.c_o_T * ((-14 / self.a_T_surface ** 2) + 105 / 4 * sed_dips_rest / self.a_T_surface ** 3 -
@@ -396,31 +639,45 @@ class TFGraph(tf.Module):
         return F_I, F_G
 
     #@tf.function
-    def covariance_matrix(self, dips_position_all, ref_layer_points, rest_layer_points,anisotropy_vector):
+    def covariance_matrix(self, dips_position_all, ref_layer_points, rest_layer_points):
 
         length_of_CG, length_of_CGI, length_of_U_I, length_of_faults, length_of_C = self.matrices_shapes()
-
-        C_G = self.cov_gradients(dips_position_all,anisotropy_vector)
-        C_I = self.cov_surface_points(ref_layer_points, rest_layer_points,anisotropy_vector)
-        C_GI = self.cov_interface_gradients(
-            dips_position_all, rest_layer_points, ref_layer_points,anisotropy_vector)
+        
+        #print(" I am here")
+        #C_G_Mig = self.cov_gradients(dips_position_all)
+        C_G = self.cov_gradients2(dips_position_all)
+        # print("Difference between C_G_Mig  and C_G_Deep is computed\n", C_G_Mig-C_G)
+        # print("C_G_Mig\n",C_G_Mig )
+        # print("C_G_Deep\n",C_G )
+        
+        C_I = self.cov_surface_points(ref_layer_points, rest_layer_points )
+        #print("C_I",C_I.shape)
+        # C_GI = self.cov_interface_gradients(
+        #     dips_position_all, rest_layer_points, ref_layer_points)
+        #print(" Let's check")
+        C_GI = self.cov_interface_gradients2(
+            dips_position_all, rest_layer_points, ref_layer_points)
+        #print("Difference between C_GI_Mig and C_GI_Deep \n", tf.transpose(C_GI_Mig)- C_GI)
+        #print("C_GI_Deep \n", C_GI)
         U_G, U_I = self.universal_matrix(
             dips_position_all, ref_layer_points, rest_layer_points)
         U_G = U_G[:length_of_CG, :3]
         U_I = U_I[:length_of_CGI, :3]
         F_I, F_G = self.faults_matrix()
-
+        
         # A: containing all the covariance matrix 
         A = tf.concat([tf.concat([C_G, tf.transpose(C_GI)], -1),
                        tf.concat([C_GI, C_I], -1)], 0)
-
+        # A = tf.concat([tf.concat([C_G, C_GI], -1),
+        #                tf.concat([tf.transpose(C_GI), C_I], -1)], 0)
+        #print("A", A.shape)
         # B: Universal term
         B = tf.concat([U_G, U_I], 0)
 
         AB = tf.concat([A, B], -1)
 
         B_T = tf.transpose(B)
-
+        #print("b_T", B_T)
         if tf.shape(F_I)[0] is not None:
         #   paddings = tf.constant([[0, 0], [0, 3]])
           paddings = tf.stack([[0,0],[0,3+tf.shape(F_I)[0]]],axis = 1)
@@ -442,6 +699,7 @@ class TFGraph(tf.Module):
         C_matrix = tf.where(tf.logical_and(tf.abs(C_matrix) > 0, tf.abs(
             C_matrix) < 1e-9), tf.constant(0, dtype=self.dtype), y=C_matrix)
 
+        #print("C_matrix",C_matrix.shape)
         return C_matrix
 
     #@tf.function
@@ -477,10 +735,10 @@ class TFGraph(tf.Module):
         return b_vector
 
     #@tf.function
-    def solve_kriging(self, dips_position_all, ref_layer_points, rest_layer_points, b=None, anisotropy_vector = None):
-
+    def solve_kriging(self, dips_position_all, ref_layer_points, rest_layer_points, b=None):
+        
         C_matrix = self.covariance_matrix(
-            dips_position_all, ref_layer_points, rest_layer_points,anisotropy_vector = anisotropy_vector)
+            dips_position_all, ref_layer_points, rest_layer_points)
 
         b_vector = self.b_vector()
         # tf.print('C_matrix',C_matrix)
@@ -488,7 +746,7 @@ class TFGraph(tf.Module):
 
 
         DK = tf.linalg.solve(C_matrix, b_vector)
-
+        
         return DK
 
     #@tf.function
@@ -508,15 +766,15 @@ class TFGraph(tf.Module):
         return DK_parameters
 
     #@tf.function
-    def contribution_gradient_interface(self, dips_position_all, grid_val=None, weights=None,anisotropy_vector = None):
+    def contribution_gradient_interface(self, dips_position_all, grid_val=None, weights=None):
         dips_position_all_tiled = tf.tile(
             dips_position_all, [self.n_dimensions, 1])
         length_of_CG = self.matrices_shapes()[0]
 
-        hu_SimPoint = self.cartesian_dist(dips_position_all, grid_val,anisotropy_vector)
+        hu_SimPoint = self.cartesian_dist(dips_position_all, grid_val)
 
-        sed_dips_SimPoint = self.euclidean_distance(
-            dips_position_all_tiled, grid_val,anisotropy_vector)
+        sed_dips_SimPoint = self.squared_euclidean_distance(
+            dips_position_all_tiled, grid_val)
 
         sigma_0_grad = tf.reduce_sum((weights[:length_of_CG] *
                                       self.gi_rescale * (tf.negative(hu_SimPoint) *\
@@ -532,15 +790,15 @@ class TFGraph(tf.Module):
         return sigma_0_grad
 
     #@tf.function
-    def contribution_interface(self, ref_layer_points, rest_layer_points, grid_val, weights=None,anisotropy_vector = None):
+    def contribution_interface(self, ref_layer_points, rest_layer_points, grid_val, weights=None):
 
         length_of_CG, length_of_CGI = self.matrices_shapes()[:2]
 
         # Euclidian distances
-        sed_rest_SimPoint = self.euclidean_distance(
-            rest_layer_points, grid_val, anisotropy_vector)
-        sed_ref_SimPoint = self.euclidean_distance(
-            ref_layer_points, grid_val, anisotropy_vector)
+        sed_rest_SimPoint = self.squared_euclidean_distance(
+            rest_layer_points, grid_val)
+        sed_ref_SimPoint = self.squared_euclidean_distance(
+            ref_layer_points, grid_val)
 
         sigma_0_interf = tf.reduce_sum(-weights[length_of_CG:length_of_CG + length_of_CGI, :] *
                                        (self.c_o_T * self.i_rescale * (
@@ -758,14 +1016,14 @@ class TFGraph(tf.Module):
         return grav
     
     #@tf.function
-    def compute_scalar_field(self,weights,grid_val,fault_matrix, anisotropy_vector):
+    def compute_scalar_field(self,weights,grid_val,fault_matrix):
   
         tiled_weights = self.extend_dual_kriging(
             weights, tf.shape(grid_val)[0])
         sigma_0_grad = self.contribution_gradient_interface(self.dips_position,
-                                                            grid_val, tiled_weights,anisotropy_vector = anisotropy_vector)
+                                                            grid_val, tiled_weights)
         sigma_0_interf = self.contribution_interface(
-            self.ref_layer_points, self.rest_layer_points, grid_val, tiled_weights,anisotropy_vector = anisotropy_vector)
+            self.ref_layer_points, self.rest_layer_points, grid_val, tiled_weights)
         f_0 = self.contribution_universal_drift(grid_val, weights)
         f_1 = self.contribution_faults(weights,fault_matrix)
 
@@ -789,8 +1047,7 @@ class TFGraph(tf.Module):
                          block_matrix=None, weights_vector=None,
                          scalar_field_matrix=None, sfai_concat=None, mask_matrix=None,property_matrix = None,
                          mask_matrix_f=None, fault_matrix=None, nsle=0, grid=None,
-                         shift=None,
-                         anisotropy_vector = None
+                         shift=None
                          ):
         """
         Function that loops each fault, generating a potential field for each on them with the respective block model
@@ -896,11 +1153,11 @@ class TFGraph(tf.Module):
 
         grid_val = self.x_to_interpolate(
             self.grid_val, self.ref_layer_points_all, self.rest_layer_points_all)
-        weights = self.solve_kriging(
-            self.dips_position, self.ref_layer_points, self.rest_layer_points,anisotropy_vector = anisotropy_vector)
-        # tf.print('weights',weights)
-        Z_x = self.compute_scalar_field(weights,grid_val,fault_matrix_op,anisotropy_vector)
         
+        weights = self.solve_kriging(
+            self.dips_position, self.ref_layer_points, self.rest_layer_points)
+        # tf.print('weights',weights)
+        Z_x = self.compute_scalar_field(weights,grid_val,fault_matrix_op)
         
         scalar_field_at_surface_points = self.get_scalar_field_at_surface_points(Z_x,
                                                                                  self.npf_op)
@@ -969,20 +1226,18 @@ class TFGraph(tf.Module):
         #       self.fault_matrix, nsle
 
     # @tf.function
-    def compute_series(self,surface_point_all,dips_position_all,dip_angles, azimuth, polarity, values_properties = None, anisotropy_vec = None):
+    def compute_series(self,surface_point_all,dips_position_all,dip_angles, azimuth, polarity, values_properties = None):
         
         self.update_property()
         if self.gradient:
             # self.sig_slope = self.max_slope - tf.abs(self.delta_slope) # default in GemPy 50 when select gravity calculation
-            ##### Define the slope between 0 and max_slope, connected by another sigmoid function
+            ##### Define the slope between 0 and min_slope, connected by another sigmoid function
             ##### 0 <- delta_slope is most trainable, but may lose accuracy
             ##### delta_slope -> max_slope is the least to keep gradient
-            
 
-            ## Scale the sigmoid function to the proper scale for the grid size defined by max_slope. 
             self.sig_slope = self.max_slope*tf.math.sigmoid(self.delta_slope)
         else:
-            self.sig_slope = 5e10 # if 
+            self.sig_slope = self.delta_slope
 
         self.ref_layer_points_all, self.rest_layer_points_all, self.ref_nugget, self.rest_nugget = self.set_rest_ref_matrix(
             self.number_of_points_per_surface_T, surface_point_all, self.nugget_effect_scalar)
@@ -1004,7 +1259,7 @@ class TFGraph(tf.Module):
 
         self.fault_matrix = tf.zeros((0,matrix_fix_dim),dtype=self.dtype)
 
-        self.anisotropy_vec = anisotropy_vec
+
         # for i in range(num_series):
         #     tf.autograph.experimental.set_loop_options(
         #             shape_invariants=[(self.block_matrix, tf.TensorShape([None, self.matrix_size]))])
@@ -1048,8 +1303,7 @@ class TFGraph(tf.Module):
                     block_matrix=block_matrix, weights_vector=None,
                     scalar_field_matrix=scalar_matrix, sfai_concat=sfai, mask_matrix=mask_matrix,fault_matrix = fault_matrix,property_matrix=property_matrix,
                     nsle=0, grid=None,
-                    shift=None,
-                    anisotropy_vector = self.anisotropy_vec[i])
+                    shift=None)
             return [i+tf.constant(1, dtype=tf.int32,name = 'i_increment'), block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix]
         # b = lambda i,block_matrix,property_matrix, scalar_matrix, sfai, mask_matrix, fault_matrix: [i+1, self.compute_a_series(surface_point_all,dips_position_all,dip_angles,azimuth,polarity,value_properties,
         #             len_i_0=self.len_series_i[i], len_i_1=self.len_series_i[i+1],

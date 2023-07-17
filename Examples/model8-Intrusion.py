@@ -5,7 +5,7 @@ sys.path.append('../GP_old/')
 import gempy as gp
 import numpy as np
 
-from gempy.core.tensor.modeltf_var import ModelTF
+from gempy.core.tensor.modeltf_var_Deep import ModelTF
 import tensorflow as tf
 
 tf.config.run_functions_eagerly(True)
@@ -30,10 +30,10 @@ gp.map_series_to_surfaces(geo_data, {"Strat_Series1": ('rock3'),
 
 # geo_data.surface_points.modify_surface_points(21,Z = 600,surface = 'rock2')
 
-mapping_object = {'Strat_Series1':   np.array([1,1,0.01]),
-                'Strat_Series2':   np.array([1,1,1]),
-                'Basement_Series': np.array([1,1,1])}
-gp.assign_global_anisotropy(geo_data,mapping_object)
+# mapping_object = {'Strat_Series1':   np.array([1,1,0.01]),
+#                 'Strat_Series2':   np.array([1,1,1]),
+#                 'Basement_Series': np.array([1,1,1])}
+# gp.assign_global_anisotropy(geo_data,mapping_object)
 # %%
 ## I will integrate the module into GemPy through Interpolator later
 model = ModelTF(geo_data)
