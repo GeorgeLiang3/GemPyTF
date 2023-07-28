@@ -3,6 +3,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 import timeit
+from datetime import timedelta
 import numpy as np
 from ..Geophysics.utils.util import constant64
 from .gpCN import gpCN_MCMC
@@ -18,6 +19,9 @@ class Stat_model(object):
         self.sfp_shape = [self.num_sfp_para,3]
         self.tz = tz
         self.transformer = transformer
+
+    def set_result_path(self, path):
+        self.path = path
 
     def set_prior(self,Number_para = 70):
         '''
@@ -203,7 +207,9 @@ class Stat_model(object):
             states  = self.RMH(num_results,number_burnin,step_size,parallel_iterations = 1)
             end = timeit.default_timer()
             self.time_rmh = end-start
-            print('Random walk time in seconds: %.3f' % (self.time_rmh))
+            # print('Random walk time in seconds: %.3f' % (self.time_rmh))
+            td = timedelta(seconds=self.time_rmh)
+            print('RMH running time: ', td)
             
             return states 
         
@@ -213,7 +219,10 @@ class Stat_model(object):
             states  = self.HMC(num_results,number_burnin,step_size,num_leapfrog_steps)
             end = timeit.default_timer()
             self.time_hmc = end-start
-            print('HMC time in seconds: %.3f' % (self.time_hmc))
+            # Convert seconds to hours, minutes and seconds
+            td = timedelta(seconds=self.time_hmc)
+            # print('HMC time in seconds: %.3f' % (self.time_hmc))
+            print('HMC running time: ', td)
             
             return states 
             
