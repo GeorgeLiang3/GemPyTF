@@ -924,9 +924,15 @@ class TFGraph(tf.Module):
             #     mask_e = tf.ones(tf.shape(Z_x), dtype = self.mask_dtype)
             # mask_e = tf.ones(tf.shape(Z_x), dtype = 'bool')
         mask_e = tf.expand_dims(mask_e,axis=0)
-        
-        block = self.export_formation_block(Z_x, scalar_field_at_surface_points, value_properties[:,
-                                   n_form_per_serie_0: n_form_per_serie_1 + 1],n_series)
+        if is_erosion:
+            ## Here we do not want to have the slope added to the boundary of the series here, but using the mask_e to do this. So this is a hacky way. Repeat the same properties and keeps the same logic. 
+   
+            this_properties = tf.repeat(value_properties[:,n_form_per_serie_0: n_form_per_serie_1 + 1][:,0:1],repeats = [2],axis = 1)
+
+            block = self.export_formation_block(Z_x, scalar_field_at_surface_points, this_properties,n_series)
+        else:
+            block = self.export_formation_block(Z_x, scalar_field_at_surface_points, value_properties[:,
+                                    n_form_per_serie_0: n_form_per_serie_1 + 1],n_series)
         self.block = block
 
         ## In theano, this is done by set_subtensor, because tensor does not allow tensor assignment, here I use concat
@@ -1102,6 +1108,7 @@ class TFGraph(tf.Module):
           final_block = tf.reduce_sum(block_mask*self.block_matrix,0)
           if self.compute_gravity_flag == True:
             final_property= tf.reduce_sum(block_mask*self.property_matrix,0,name = 'reduce_sum_final_property')
+            # final_property= block_mask[0]*self.property_matrix[0] + (1-block_mask[0])*self.property_matrix[1]
           else:
             final_property = self.property_matrix
         
