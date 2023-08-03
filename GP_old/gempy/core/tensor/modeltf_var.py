@@ -401,17 +401,20 @@ class ModelTF(DataMutation):
         # self.create_tensorflow_graph(gpinput,gradient = gradient,slope = 500000,matrix_size = self.matrix_size)
         
 
-    def compute_model(self,surface_points = None,dip_angles = None,gradient = False):
+    def compute_model(self,surface_points = None,dip_angles = None,gradient = False,values_properties = None):
         self.prepare_input(gradient,surface_points)
         if surface_points is None:
             surface_points = self.surface_points_coord
         if dip_angles is None:
             dip_angles = self.dip_angles
+        if values_properties is None:
+            values_properties = self.values_properties
         final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
                     self.dips_position,
                     dip_angles,
                     self.azimuth,
                     self.polarity,
+                    values_properties = values_properties,
                     anisotropy_vec = self.anisotropy_vector)
         
         self.grid = self._grid
@@ -420,7 +423,7 @@ class ModelTF(DataMutation):
         self.set_solutions(sol)
 
     # @tf.function
-    def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,dip_angles = None,gradient = False,Hessian = False,method = None,window_resolution = None,grav_only = False,LOOP_FLAG = True, values_properties = None):
+    def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,dip_angles = None,method = None,DEBUG_FLAG = False,LOOP_FLAG = True, all_properties = None):
         implemented_methods_lst = ['conv_all','kernel_reg','kernel_geom','kernel_ml']
         if method in implemented_methods_lst: 
             pass   
@@ -440,7 +443,7 @@ class ModelTF(DataMutation):
                         dip_angles,
                         self.azimuth,
                         self.polarity,
-                        values_properties = values_properties,
+                        values_properties = all_properties,
                         anisotropy_vec = self.anisotropy_vector)
 
             # densities = final_property[0:size] # slice the density by resolution
@@ -480,7 +483,7 @@ class ModelTF(DataMutation):
                             dip_angles,
                             self.azimuth,
                             self.polarity,
-                            values_properties = values_properties,
+                            values_properties = all_properties,
                             anisotropy_vec = self.anisotropy_vector)
                 size = kernel.values.shape[0]
                 densities = final_property[:size]
@@ -502,13 +505,11 @@ class ModelTF(DataMutation):
                     grav_ = self.TFG.compute_forward_gravity(tz, 0, size, windowed_densities)
                     grav = grav.write(i, grav_)
                 grav = tf.squeeze(grav.stack())
-
-
         
-        if grav_only == True:
-            return grav
-        else:
+        if DEBUG_FLAG == True:
             return final_block,final_property,block_matrix,block_mask,size,Z_x,sfai,grav
+        else:
+            return grav
     
     def revert_coordinates_alongz(self,values):
         value_dim = 3

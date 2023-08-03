@@ -33,3 +33,6 @@ gp._plot.plot_3d(model)
 gp.plot.plot_section(model, cell_number=15,
                          direction='y', show_data=True,show_all_data = True,show_boundaries = True)
 # %%
+gp.plot.plot_section(model, cell_number=40,
+                         direction='y', show_data=True)
+# %%

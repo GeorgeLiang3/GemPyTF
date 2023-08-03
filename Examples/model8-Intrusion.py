@@ -38,7 +38,8 @@ gp.map_series_to_surfaces(geo_data, {"Strat_Series1": ('rock3'),
 ## I will integrate the module into GemPy through Interpolator later
 model = ModelTF(geo_data)
 model.activate_regular_grid()
-model.create_tensorflow_graph(gradient = False)
+Transformation_matrix = np.array([[1.,0.,0.],[0.,1.,0.],[0.,0.,1]])
+model.create_tensorflow_graph(gradient = False, Transformation_matrix = Transformation_matrix)
 
 
 # %%

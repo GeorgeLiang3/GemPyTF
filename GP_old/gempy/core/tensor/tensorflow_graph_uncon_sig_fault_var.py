@@ -813,8 +813,6 @@ class TFGraph(tf.Module):
         self.dips_position_tiled = tf.tile(
             self.dips_position, [self.n_dimensions, 1])
 
-        
-
         # self.nugget_effect_scalar_ref_rest = tf.expand_dims(
         #     self.ref_nugget + self.rest_nugget, 1)
 
@@ -933,8 +931,10 @@ class TFGraph(tf.Module):
 
         ## In theano, this is done by set_subtensor, because tensor does not allow tensor assignment, here I use concat
         block_matrix = tf.concat([block_matrix,tf.slice(block,[0,0],[1,-1])],axis=0)
+        # TODO: is fault?
         fault_matrix = tf.concat([fault_matrix,tf.slice(block,[0,0],[1,-1])],axis=0)
         if self.compute_gravity_flag == True:
+            # if self.is_fault[n_series]:
             property_matrix = tf.concat([property_matrix,tf.slice(block,[1,0],[1,-1])],axis=0)
 
         mask_matrix = tf.concat([mask_matrix,mask_e],axis=0)
