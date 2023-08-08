@@ -11,7 +11,7 @@ class TFGraph(tf.Module):
 
     def __init__(self, input,
                  fault_drift, grid, values_properties,nugget_effect_grad,nugget_effect_scalar,
-                Range, C_o, rescalefactor,delta_slope=50, output=None,sigmoid=False,compute_gravity = False,matrix_size = None, **kwargs):
+                Range, C_o, rescalefactor,delta_slope=50, output=None,sigmoid=False,compute_gravity = False,matrix_size = None,len_points = None, **kwargs):
         super(TFGraph, self).__init__()
         
         (self.number_of_points_per_surface_T,
@@ -35,7 +35,7 @@ class TFGraph(tf.Module):
         self.dtype = kwargs.get('dtype', tf.float32)
         self.lengh_of_faults = tf.constant(0, dtype=tf.int32)
 
-    
+        self.len_points = len_points
 
         # OPETIONS
         # -------
@@ -100,6 +100,9 @@ class TFGraph(tf.Module):
 
         self.grid_val = grid
 
+        # # Predefine the constants
+        # self.len_points = tf.shape(surface_point_all)[0] - \
+        #     tf.shape(self.number_of_points_per_surface_T)[0]
 
 
         if output is None:
@@ -686,7 +689,7 @@ class TFGraph(tf.Module):
         return sigm
 
     #@tf.function
-    def export_formation_block(self, Z_x, scalar_field_at_surface_points, values_properties,n_seires):
+    def export_formation_block(self, Z_x, scalar_field_at_surface_points, values_properties):
 
         
         slope = self.sig_slope
@@ -816,8 +819,8 @@ class TFGraph(tf.Module):
         # self.nugget_effect_scalar_ref_rest = tf.expand_dims(
         #     self.ref_nugget + self.rest_nugget, 1)
 
-        self.len_points = tf.shape(surface_point_all)[0] - \
-            tf.shape(self.number_of_points_per_surface_T)[0]
+        # self.len_points = tf.shape(surface_point_all)[0] - \
+        #     tf.shape(self.number_of_points_per_surface_T)[0]
         
         self.a_T_scalar = range
         self.c_o_T_scalar = c_o
@@ -864,7 +867,7 @@ class TFGraph(tf.Module):
         # indices = tf.cast(tf.where(faults_relation_op,name = 'where_indices'),dtype = tf.int32,name = 'ind_cast') ## tensorflow find nonzero index, reproduce Theano.nonzero
         # indices = tf.squeeze(indices)
         fault_matrix_op = tf.gather(fault_matrix,indices,name = 'gather_fm') # select the dimension where fault relation is true
-        fault_matrix_op = tf.reshape(fault_matrix_op,[-1,x_to_interpolate_shape])* self.offset
+        fault_matrix_op = tf.squeeze(fault_matrix_op)* self.offset
         # fault_matrix_op = self.fault_matrix[
         #                   T.nonzero(tf.cast(faults_relation_op, tf.int8))[0],
         #                   0, shift:x_to_interpolate_shape + shift] * self.offset
@@ -927,12 +930,15 @@ class TFGraph(tf.Module):
         if is_erosion:
             ## Here we do not want to have the slope added to the boundary of the series here, but using the mask_e to do this. So this is a hacky way. Repeat the same properties and keeps the same logic. 
    
-            this_properties = tf.repeat(value_properties[:,n_form_per_serie_0: n_form_per_serie_1 + 1][:,0:1],repeats = [2],axis = 1)
+            this_properties = tf.repeat(value_properties[:,n_form_per_serie_0: n_form_per_serie_1],repeats = [2],axis = 1)
 
-            block = self.export_formation_block(Z_x, scalar_field_at_surface_points, this_properties,n_series)
+            # this_properties = value_properties[:,n_form_per_serie_0: n_form_per_serie_1 + 1]
+            # block = self.export_formation_block(Z_x, scalar_field_at_surface_points, this_properties,n_series)
         else:
-            block = self.export_formation_block(Z_x, scalar_field_at_surface_points, value_properties[:,
-                                    n_form_per_serie_0: n_form_per_serie_1 + 1],n_series)
+            this_properties = value_properties[:,n_form_per_serie_0: n_form_per_serie_1 + 1]
+            # block = self.export_formation_block(Z_x, scalar_field_at_surface_points, value_properties[:,
+            #                         n_form_per_serie_0: n_form_per_serie_1 + 1],n_series)
+        block = self.export_formation_block(Z_x, scalar_field_at_surface_points, this_properties)
         self.block = block
 
         ## In theano, this is done by set_subtensor, because tensor does not allow tensor assignment, here I use concat
@@ -996,8 +1002,8 @@ class TFGraph(tf.Module):
         self.nugget_effect_scalar_T_ref_rest = tf.expand_dims(
             self.ref_nugget + self.rest_nugget, 1)
         
-        self.len_points = tf.shape(surface_point_all)[0] - \
-            tf.shape(self.number_of_points_per_surface_T)[0]
+        # self.len_points = tf.shape(surface_point_all)[0] - \
+        #     tf.shape(self.number_of_points_per_surface_T)[0]
             
         num_series = self.len_series_i.shape[0] - tf.constant(1, dtype=tf.int32,name = 'num_series_')
         
