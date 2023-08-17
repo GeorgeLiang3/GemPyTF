@@ -867,7 +867,7 @@ class TFGraph(tf.Module):
         # indices = tf.cast(tf.where(faults_relation_op,name = 'where_indices'),dtype = tf.int32,name = 'ind_cast') ## tensorflow find nonzero index, reproduce Theano.nonzero
         # indices = tf.squeeze(indices)
         fault_matrix_op = tf.gather(fault_matrix,indices,name = 'gather_fm') # select the dimension where fault relation is true
-        fault_matrix_op = tf.squeeze(fault_matrix_op)* self.offset
+        fault_matrix_op = tf.reshape(fault_matrix_op,[-1,x_to_interpolate_shape])* self.offset
         # fault_matrix_op = self.fault_matrix[
         #                   T.nonzero(tf.cast(faults_relation_op, tf.int8))[0],
         #                   0, shift:x_to_interpolate_shape + shift] * self.offset
@@ -987,10 +987,10 @@ class TFGraph(tf.Module):
         if self.gradient:
             # self.sig_slope = self.max_slope - tf.abs(self.delta_slope) # default in GemPy 50 when select gravity calculation
             ##### Define the slope between 0 and max_slope, connected by another sigmoid function
+            ## CAUTION: This sigmoid function is not the same sigmoid function used to define the transition between layers. This sigmoid function defines the final slope used in modeling. It limits the slope in range 0 to max_slope. 
             ##### 0 <- delta_slope is most trainable, but may lose accuracy
             ##### delta_slope -> max_slope is the least to keep gradient
             
-
             ## Scale the sigmoid function to the proper scale for the grid size defined by max_slope. 
             self.sig_slope = self.max_slope*tf.math.sigmoid(self.delta_slope)
         else:

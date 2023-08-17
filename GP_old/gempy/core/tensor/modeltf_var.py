@@ -431,7 +431,7 @@ class ModelTF(DataMutation):
         self.set_solutions(sol)
 
     # @tf.function
-    def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,dip_angles = None,method = None,DEBUG_FLAG = False,LOOP_FLAG = True, all_properties = None):
+    def compute_gravity(self,tz,receivers,g = None,kernel = None,surface_points = None,dips_angles = None,dips_position = None, method = None,DEBUG_FLAG = False,LOOP_FLAG = True, all_properties = None):
         implemented_methods_lst = ['conv_all','kernel_reg','kernel_geom','kernel_ml']
         if method in implemented_methods_lst: 
             pass   
@@ -440,15 +440,17 @@ class ModelTF(DataMutation):
 
         if surface_points is None:
             surface_points = self.surface_points_coord
-        if dip_angles is None:
-            dip_angles = self.dip_angles
+        if dips_position is None:
+            dips_position = self.dips_position
+        if dips_angles is None:
+            dips_angles = self.dip_angles
         if method == 'conv_all':
 
             size = tf.reduce_prod(self.resolution_,name = 'reduce_prod_size_')
 
             final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
-                        self.dips_position,
-                        dip_angles,
+                        dips_position,
+                        dips_angles,
                         self.azimuth,
                         self.polarity,
                         values_properties = all_properties,
@@ -487,8 +489,8 @@ class ModelTF(DataMutation):
             if LOOP_FLAG == False:
                 # Vectorized computation
                 final_block,final_property,block_matrix,Z_x,sfai,block_mask,fault_matrix = self.TFG.compute_series(surface_points,
-                            self.dips_position,
-                            dip_angles,
+                            dips_position,
+                            dips_angles,
                             self.azimuth,
                             self.polarity,
                             values_properties = all_properties,
