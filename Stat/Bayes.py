@@ -195,7 +195,7 @@ class Stat_model(object):
                  MAP = None,
                  Hess = None
                  ):
-        methods = {'RMH','HMC','gpCN'}
+        methods = {'RMH','HMC','NUTS','gpCN'}
         self.unnormalized_posterior_log_prob = lambda *args: self.graph_joint_log_post(*args)
         
         if method not in methods:
@@ -223,6 +223,18 @@ class Stat_model(object):
             td = timedelta(seconds=self.time_hmc)
             # print('HMC time in seconds: %.3f' % (self.time_hmc))
             print('HMC running time: ', td)
+            
+            return states 
+        
+        if method == 'NUTS':
+     
+            states  = self.NUTS(num_results,number_burnin,step_size)
+            end = timeit.default_timer()
+            self.time_nuts = end-start
+            # Convert seconds to hours, minutes and seconds
+            td = timedelta(seconds=self.time_nuts)
+            # print('HMC time in seconds: %.3f' % (self.time_hmc))
+            print('NUTS running time: ', td)
             
             return states 
             
@@ -298,6 +310,25 @@ class Stat_model(object):
                 target_log_prob_fn=self.unnormalized_posterior_log_prob,
                 step_size = step_size,
                 num_leapfrog_steps = num_leapfrog_steps),
+            num_burnin_steps=number_burnin,
+            num_steps_between_results=0,  # Thinning.
+            parallel_iterations=1,
+            seed=42)
+        return states 
+    
+    @tf.function
+    def NUTS(self,num_results,number_burnin,step_size):
+        states  = tfp.mcmc.sample_chain(
+            num_results=num_results,
+            current_state=self.initial_chain_state,
+            # trace_fn=None,
+            kernel=tfp.mcmc.NoUTurnSampler(
+                target_log_prob_fn=self.unnormalized_posterior_log_prob,
+                step_size = step_size,
+                max_tree_depth=10,
+                max_energy_diff=1000.0,
+                unrolled_leapfrog_steps=1,
+                parallel_iterations=2),
             num_burnin_steps=number_burnin,
             num_steps_between_results=0,  # Thinning.
             parallel_iterations=1,
