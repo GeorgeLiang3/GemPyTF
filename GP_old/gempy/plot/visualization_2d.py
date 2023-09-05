@@ -38,7 +38,7 @@ import sys
 # This is for sphenix to find the packages
 sys.path.append( path.dirname( path.dirname( path.abspath(__file__) ) ) )
 from gempy.core.solution import Solution
-import gempy.plot.helpers as plothelp
+# import gempy.plot.helpers as plothelp
 sns.set_context('talk')
 plt.style.use(['seaborn-white', 'seaborn-talk'])
 from scipy.interpolate import RegularGridInterpolator
@@ -622,7 +622,7 @@ class PlotSolution(PlotData2D):
             CS = ax.contour(self.model.grid.topography.values_3D[:, :, 2], cmap='Greys', linestyles='solid',
                             extent=self.model.grid.topography.extent, zlevel=200)
             ax.clabel(CS, inline=1, fontsize=10, fmt='%d')
-            plothelp.add_colorbar(im=im, label='elevation [m]', cs=CS, aspect=35)
+            # plothelp.add_colorbar(im=im, label='elevation [m]', cs=CS, aspect=35)
 
         # self.extract_section_lines('topography')
 
@@ -683,7 +683,7 @@ class PlotSolution(PlotData2D):
                              extent=extent, zorder=zorder)
             c_id += len(level)
 
-    def extract_fault_lines(self, cell_number=25, direction='y'):
+    def extract_fault_lines(self, cell_number=25, direction='y', ax = None, alpha = 1):
         faults = list(self.model.faults.df[self.model.faults.df['isFault'] == True].index)
         if len(faults) == 0:
             pass
@@ -695,8 +695,12 @@ class PlotSolution(PlotData2D):
                 level = self.model.solutions.scalar_field_at_surface_points[f_id][np.where(
                     self.model.solutions.scalar_field_at_surface_points[f_id] != 0)]
                 level.sort()
-                plt.contour(block.reshape(self.model.grid.regular_grid.resolution)[_slice].T, 0, extent=extent, levels=level,
-                         colors=self._cmap.colors[f_id], linestyles='solid')
+                if ax is not None:
+                    ax.contour(block.reshape(self.model.grid.regular_grid.resolution)[_slice].T, 0, extent=extent,levels=level,
+                         colors=self._cmap.colors[f_id], linestyles='solid', alpha = alpha)
+                else:
+                    plt.contour(block.reshape(self.model.grid.regular_grid.resolution)[_slice].T, 0, extent=extent, levels=level,
+                            colors=self._cmap.colors[f_id], linestyles='solid', alpha = alpha)
 
     def plot_section_by_name(self, section_name, show_data=True, show_faults=True, show_topo=True,
                              show_all_data=False, contourplot=True, radius='default', **kwargs):
@@ -896,7 +900,8 @@ class PlotSolution(PlotData2D):
     def plot_block_section(self, solution:Solution, cell_number:int, block:np.ndarray=None, direction:str="y",
                            interpolation:str='none', show_data:bool=False, show_faults:bool=False, show_topo:bool=False,
                            block_type=None, ve:float=1, show_legend:bool = True, show_all_data:bool=False,show_boundaries:bool=False,
-                           ax=None,
+                           show_block = True,
+                           ax=None,hide_lable = True,
                            **kwargs):
         """Plot a section of the block model
 
@@ -976,17 +981,22 @@ class PlotSolution(PlotData2D):
         # if 'figsize' in imshow_kwargs:
         #     imshow_kwargs.pop('figsize')
         #     plt.figure(figsize = kwargs['figsize'])
-        im = plt.imshow(sliced_block,
-                        origin="lower",
-                        extent=extent_val,
-                        interpolation=interpolation,
-                        aspect=aspect,
-                        **imshow_kwargs)
+        if show_block:
+            im = plt.imshow(sliced_block,
+                            origin="lower",
+                            extent=extent_val,
+                            interpolation=interpolation,
+                            aspect=aspect,
+                            **imshow_kwargs)
         if extent_val[3] < extent_val[2]: # correct vertical orientation of plot
             plt.gca().invert_yaxis()    # if maximum vertical extent negative
 
         if show_faults:
-            self.extract_fault_lines(cell_number, direction)
+            if 'alpha' in imshow_kwargs:
+                alpha = imshow_kwargs['alpha']
+            else:
+                alpha = 1
+            self.extract_fault_lines(cell_number, direction, ax = ax, alpha = alpha)
 
         if show_topo:
             if self.model.grid.topography is not None:
@@ -1028,10 +1038,11 @@ class PlotSolution(PlotData2D):
         n_y = int(number_grid_y //n)
         # n = 5  # Keeps every 5th label
 
-        [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n_x != 0 or l._x % 100 != 0]
-        [l.set_visible(False) for (i,l) in enumerate(ax.yaxis.get_ticklabels()) if i % n_y != 0]
-        plt.xlabel(x)
-        plt.ylabel(y)
+        if hide_lable is True:
+            [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n_x != 0 or l._x % 100 != 0]
+            [l.set_visible(False) for (i,l) in enumerate(ax.yaxis.get_ticklabels()) if i % n_y != 0]
+            plt.xlabel(x)
+            plt.ylabel(y)
         if 'colorbar' in kwargs:
             if kwargs['colorbar'] is True: 
                 ax = plt.gca()

@@ -245,7 +245,9 @@ def plot_section(model, cell_number=13, block=None, direction="y",
                  interpolation='none',
                  show_data=True, show_faults=True, show_topo=False,
                  block_type=None, ve=1,
-                 show_all_data=False, show_legend=True,show_boundaries = False, **kwargs):
+                 show_all_data=False, show_legend=True,show_boundaries = False,
+                 show_block=True, ax = None,hide_lable = True,
+                 **kwargs):
     """
     Plot a section of the block model
 
@@ -269,7 +271,9 @@ def plot_section(model, cell_number=13, block=None, direction="y",
                                        show_data, show_faults, show_topo,
                                        block_type, ve,
                                        show_all_data=show_all_data,
-                                       show_legend=show_legend,show_boundaries=show_boundaries, **kwargs)
+                                       show_legend=show_legend,show_boundaries=show_boundaries,
+                                       show_block=show_block, ax = ax,hide_lable = hide_lable,
+                                       **kwargs)
     
     
     return plot
