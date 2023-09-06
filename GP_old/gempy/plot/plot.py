@@ -31,7 +31,7 @@ from nptyping import Array
 import gempy as _gempy
 from .visualization_2d import PlotData2D, PlotSolution
 from .visualization_3d import GemPyvtkInteract
-
+import matplotlib.colors as mcolors
 
 def plot_data_3D(geo_data, ve=1, **kwargs):
     """
@@ -266,6 +266,14 @@ def plot_section(model, cell_number=13, block=None, direction="y",
         None
     """
     plot = PlotSolution(model)
+    if block == 'lith_block':
+        block =  model.solutions.lith_block
+        norm = None
+    elif block == 'properties':
+        block = model.solutions.values_matrix
+        vmin =  model.values_properties[1][model.values_properties[1]>0].numpy().min()
+        vmax =  model.values_properties[1][model.values_properties[1]>0].numpy().max()
+        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
     plot.fig = plot.plot_block_section(model.solutions, cell_number, block,
                                        direction, interpolation,
                                        show_data, show_faults, show_topo,
@@ -273,6 +281,7 @@ def plot_section(model, cell_number=13, block=None, direction="y",
                                        show_all_data=show_all_data,
                                        show_legend=show_legend,show_boundaries=show_boundaries,
                                        show_block=show_block, ax = ax,hide_lable = hide_lable,
+                                        norm = norm,
                                        **kwargs)
     
     

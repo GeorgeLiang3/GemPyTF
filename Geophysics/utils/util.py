@@ -52,5 +52,5 @@ def calculate_slope_scale(kernel,rf):
     '''
     max_length = np.sqrt(kernel.dxyz[0]**2 + kernel.dxyz[1]**2 + kernel.dxyz[2]**2)
     # slope_scale = 1.5*2/max_length * rf
-    slope_scale = 4*2/max_length * rf
+    slope_scale = 2*2/max_length * rf
     return slope_scale
