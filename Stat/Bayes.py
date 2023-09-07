@@ -52,7 +52,7 @@ class Stat_model(object):
     # @tf.function 
     def joint_log_post(self,mu,monitor=True):
         
-        
+        tf.print('mu:',mu)
             
         likelihood_log_prob = self.log_likelihood(mu)
 
@@ -201,11 +201,11 @@ class Stat_model(object):
         
         if method not in methods:
             raise ValueError('available MCMC methods:', methods)
-        self.initial_chain_state = initial_chain_state
+        # self.initial_chain_state = initial_chain_state
 
         start = timeit.default_timer()
         if method == 'RMH':
-            states  = self.RMH(num_results,number_burnin,step_size,parallel_iterations = 1)
+            states  = self.RMH(num_results,number_burnin,step_size,initial_chain_state)
             end = timeit.default_timer()
             self.time_rmh = end-start
             # print('Random walk time in seconds: %.3f' % (self.time_rmh))
@@ -217,7 +217,7 @@ class Stat_model(object):
         if method == 'HMC':
             if num_leapfrog_steps is None:
                 ValueError('num_leapfrog_steps is required')
-            states  = self.HMC(num_results,number_burnin,step_size,num_leapfrog_steps)
+            states  = self.HMC(num_results,number_burnin,step_size,num_leapfrog_steps,initial_chain_state)
             end = timeit.default_timer()
             self.time_hmc = end-start
             # Convert seconds to hours, minutes and seconds
@@ -229,7 +229,7 @@ class Stat_model(object):
         
         if method == 'NUTS':
      
-            states  = self.NUTS(num_results,number_burnin,step_size)
+            states  = self.NUTS(num_results,number_burnin,step_size,initial_chain_state)
             end = timeit.default_timer()
             self.time_nuts = end-start
             # Convert seconds to hours, minutes and seconds
@@ -273,7 +273,7 @@ class Stat_model(object):
         return accepted_samples_gpCN, rejected_samples_gpCN, samples_gpCN
 
     @tf.function
-    def RMH(self,num_results,number_burnin,step_size,parallel_iterations = 1):
+    def RMH(self,num_results,number_burnin,step_size,initial_chain_state):
         
         def gauss_new_state_fn(scale, dtype):
             gauss = tfd.Normal(loc=dtype(0), scale=dtype(scale))
@@ -289,7 +289,7 @@ class Stat_model(object):
 
         states  = tfp.mcmc.sample_chain(
             num_results=num_results,
-            current_state=self.initial_chain_state,
+            current_state=initial_chain_state,
             # trace_fn=None,
             kernel=tfp.mcmc.RandomWalkMetropolis(
                 target_log_prob_fn=self.unnormalized_posterior_log_prob,
@@ -302,10 +302,10 @@ class Stat_model(object):
         return states
 
     @tf.function
-    def HMC(self,num_results,number_burnin,step_size,num_leapfrog_steps):
+    def HMC(self,num_results,number_burnin,step_size,num_leapfrog_steps,initial_chain_state):
         states  = tfp.mcmc.sample_chain(
             num_results=num_results,
-            current_state=self.initial_chain_state,
+            current_state=initial_chain_state,
             # trace_fn=None,
             kernel=tfp.mcmc.HamiltonianMonteCarlo(
                 target_log_prob_fn=self.unnormalized_posterior_log_prob,
@@ -318,10 +318,10 @@ class Stat_model(object):
         return states 
     
     @tf.function
-    def NUTS(self,num_results,number_burnin,step_size):
+    def NUTS(self,num_results,number_burnin,step_size,initial_chain_state):
         states  = tfp.mcmc.sample_chain(
             num_results=num_results,
-            current_state=self.initial_chain_state,
+            current_state=initial_chain_state,
             # trace_fn=None,
             kernel=tfp.mcmc.NoUTurnSampler(
                 target_log_prob_fn=self.unnormalized_posterior_log_prob,
