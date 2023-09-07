@@ -36,6 +36,11 @@ class Stat_model(object):
         self.mu_prior = tf.zeros(Number_para,self.tfdtype )
         self.std = tf.ones(Number_para,self.tfdtype )
 
+        # define prior as a multivariate normal distribution      
+        self.mvn_prior = tfd.MultivariateNormalDiag(
+            loc=self.mu_prior,
+            scale_diag = self.std
+            )
         
     
     def set_likelihood(self,Data,sigma):
@@ -47,11 +52,7 @@ class Stat_model(object):
     # @tf.function 
     def joint_log_post(self,mu,monitor=True):
         
-        # define prior as a multivariate normal distribution      
-        self.mvn_prior = tfd.MultivariateNormalDiag(
-            loc=self.mu_prior,
-            scale_diag = self.std
-            )
+        
             
         likelihood_log_prob = self.log_likelihood(mu)
 
